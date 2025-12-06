@@ -13,6 +13,25 @@ interface NotionPage {
     };
 }
 
+/**
+ * 将 Python 风格的字符串（单引号）转换为标准 JSON（双引号）
+ */
+function pythonToJson(pythonStr: string): string {
+    // 先处理转义的单引号
+    let result = pythonStr;
+
+    // 替换单引号为双引号
+    // 注意：需要处理值中包含的单引号（如 "Tom's cafe"）
+    result = result.replace(/'/g, '"');
+
+    // 处理 Python 的 True/False/None
+    result = result.replace(/\bTrue\b/g, 'true');
+    result = result.replace(/\bFalse\b/g, 'false');
+    result = result.replace(/\bNone\b/g, 'null');
+
+    return result;
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -80,14 +99,21 @@ export async function GET(
         // 解析 JSON 字符串
         let planData;
         try {
+            // 首先尝试直接解析（标准 JSON）
             planData = JSON.parse(planJsonStr);
-        } catch (parseError) {
-            console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 500));
-            console.error('Parse error:', parseError);
-            return NextResponse.json(
-                { error: '行程数据格式错误，无法解析 JSON' },
-                { status: 500 }
-            );
+        } catch {
+            // 如果失败，尝试将 Python 格式转换为 JSON
+            try {
+                const jsonStr = pythonToJson(planJsonStr);
+                planData = JSON.parse(jsonStr);
+            } catch (parseError) {
+                console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 500));
+                console.error('Parse error:', parseError);
+                return NextResponse.json(
+                    { error: '行程数据格式错误，无法解析' },
+                    { status: 500 }
+                );
+            }
         }
 
         // 获取标题
