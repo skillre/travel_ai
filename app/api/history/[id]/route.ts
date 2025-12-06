@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 interface NotionPage {
     id: string;
     properties: {
+        Title?: {
+            title: Array<{ plain_text: string }>;
+        };
         PlanJSON?: {
             rich_text: Array<{ plain_text: string }>;
         };
@@ -66,23 +69,38 @@ export async function GET(
             );
         }
 
-        const planJsonStr = planJsonProp.rich_text[0].plain_text;
+        // 获取完整的 PlanJSON 字符串（可能分布在多个 rich_text 块中）
+        let planJsonStr = '';
+        for (const textBlock of planJsonProp.rich_text) {
+            if (textBlock.plain_text) {
+                planJsonStr += textBlock.plain_text;
+            }
+        }
 
         // 解析 JSON 字符串
         let planData;
         try {
             planData = JSON.parse(planJsonStr);
-        } catch {
-            console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 200));
+        } catch (parseError) {
+            console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 500));
+            console.error('Parse error:', parseError);
             return NextResponse.json(
-                { error: '行程数据格式错误' },
+                { error: '行程数据格式错误，无法解析 JSON' },
                 { status: 500 }
             );
+        }
+
+        // 获取标题
+        let title = '';
+        const titleProp = page.properties.Title || page.properties.Name;
+        if (titleProp?.title?.[0]?.plain_text) {
+            title = titleProp.title[0].plain_text;
         }
 
         return NextResponse.json({
             success: true,
             data: planData,
+            title: title,
         });
 
     } catch (error) {

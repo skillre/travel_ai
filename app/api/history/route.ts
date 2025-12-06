@@ -74,9 +74,9 @@ export async function GET(request: NextRequest) {
 
         // 格式化返回数据
         const records = data.results.map((page) => {
-            // 获取标题 - 尝试多个可能的字段名
+            // 获取标题 - 优先使用 Title 字段
             let title = '未命名行程';
-            const titleProp = page.properties.Name || page.properties.Title || page.properties['名称'];
+            const titleProp = page.properties.Title || page.properties.Name || page.properties['名称'];
             if (titleProp?.title?.[0]?.plain_text) {
                 title = titleProp.title[0].plain_text;
             }
