@@ -16,6 +16,11 @@ const MapContainer = dynamic(() => import('./components/MapContainer'), {
     ),
 });
 
+// 动态导入历史记录面板
+const HistoryPanel = dynamic(() => import('./components/HistoryPanel'), {
+    ssr: false,
+});
+
 interface Route {
     name: string;
     desc: string;
@@ -40,6 +45,9 @@ export default function Home() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [tripData, setTripData] = useState<TripData | null>(null);
+    const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     const handleGenerate = async () => {
         if (!query.trim()) {
@@ -66,10 +74,32 @@ export default function Home() {
             }
 
             setTripData(result.data);
+            setWorkflowRunId(result.workflow_run_id || null);
         } catch (err) {
             setError(err instanceof Error ? err.message : '生成行程失败，请稍后重试');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleSelectHistory = async (pageId: string) => {
+        setIsLoadingHistory(true);
+        setError(null);
+
+        try {
+            const response = await fetch(`/api/history/${pageId}`);
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || '加载失败');
+            }
+
+            setTripData(result.data);
+            setWorkflowRunId(pageId);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '加载历史记录失败');
+        } finally {
+            setIsLoadingHistory(false);
         }
     };
 
@@ -82,7 +112,7 @@ export default function Home() {
     return (
         <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
             {/* 顶部输入区域 */}
-            <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
+            <header className="sticky top-0 z-30 backdrop-blur-xl bg-slate-900/80 border-b border-white/10">
                 <div className="max-w-7xl mx-auto px-4 py-4">
                     <div className="flex flex-col sm:flex-row items-center gap-4">
                         {/* Logo 和标题 */}
@@ -105,9 +135,9 @@ export default function Home() {
                                     onKeyPress={handleKeyPress}
                                     placeholder="输入您的旅行需求，如：厦门2日游、美食和拍照"
                                     className="w-full px-5 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50 transition-all"
-                                    disabled={isLoading}
+                                    disabled={isLoading || isLoadingHistory}
                                 />
-                                {isLoading && (
+                                {(isLoading || isLoadingHistory) && (
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2">
                                         <div className="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
                                     </div>
@@ -115,10 +145,19 @@ export default function Home() {
                             </div>
                             <button
                                 onClick={handleGenerate}
-                                disabled={isLoading}
+                                disabled={isLoading || isLoadingHistory}
                                 className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 whitespace-nowrap"
                             >
                                 {isLoading ? '生成中...' : '生成行程'}
+                            </button>
+                            {/* 历史记录按钮 */}
+                            <button
+                                onClick={() => setIsHistoryOpen(true)}
+                                className="px-4 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white transition-all flex items-center gap-2"
+                                title="历史记录"
+                            >
+                                <span>📚</span>
+                                <span className="hidden sm:inline">历史</span>
                             </button>
                         </div>
                     </div>
@@ -129,11 +168,28 @@ export default function Home() {
                             ⚠️ {error}
                         </div>
                     )}
+
+                    {/* 当前记录 ID */}
+                    {workflowRunId && (
+                        <div className="mt-3 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-cyan-400 text-xs font-mono inline-block">
+                            记录 ID: {workflowRunId.substring(0, 20)}...
+                        </div>
+                    )}
                 </div>
             </header>
 
             {/* 主内容区域 */}
             <div className="flex flex-col" style={{ height: 'calc(100vh - 80px)' }}>
+                {/* 加载历史记录时的遮罩 */}
+                {isLoadingHistory && (
+                    <div className="absolute inset-0 z-20 bg-slate-900/80 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-white font-medium">加载历史记录...</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* 地图区域 - 60% 高度 */}
                 <div className="h-[60%] p-4">
                     {tripData ? (
@@ -148,6 +204,12 @@ export default function Home() {
                                 <p className="text-gray-400 max-w-md">
                                     在上方输入您的旅行需求，AI 将为您规划完美的行程路线
                                 </p>
+                                <button
+                                    onClick={() => setIsHistoryOpen(true)}
+                                    className="mt-6 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors"
+                                >
+                                    📚 查看历史记录
+                                </button>
                             </div>
                         </div>
                     )}
@@ -235,6 +297,13 @@ export default function Home() {
                     )}
                 </div>
             </div>
+
+            {/* 历史记录面板 */}
+            <HistoryPanel
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                onSelectRecord={handleSelectHistory}
+            />
         </main>
     );
 }

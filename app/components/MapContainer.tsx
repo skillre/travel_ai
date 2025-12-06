@@ -1,12 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-
-declare global {
-    interface Window {
-        AMap: any;
-    }
-}
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface Route {
     name: string;
@@ -38,57 +32,86 @@ const dayColors = [
 export default function MapContainer({ dailyPlan }: MapContainerProps) {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
+    const AMapRef = useRef<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [mapReady, setMapReady] = useState(false);
 
+    // 初始化地图
     useEffect(() => {
+        let isMounted = true;
+
         const initMap = async () => {
             try {
+                // 动态导入高德地图加载器
                 const AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
 
+                const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
+                if (!amapKey) {
+                    throw new Error('缺少高德地图 API Key');
+                }
+
+                // 使用 1.4.15 版本更稳定
                 const AMap = await AMapLoader.load({
-                    key: process.env.NEXT_PUBLIC_AMAP_KEY || '',
-                    version: '2.0',
-                    plugins: ['AMap.Scale', 'AMap.ToolBar'],
+                    key: amapKey,
+                    version: '1.4.15',
+                    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.InfoWindow'],
                 });
 
-                if (!mapRef.current) return;
+                if (!isMounted || !mapRef.current) return;
 
+                AMapRef.current = AMap;
+
+                // 创建地图实例
                 const map = new AMap.Map(mapRef.current, {
                     zoom: 12,
                     center: [118.089, 24.479], // 默认厦门
-                    mapStyle: 'amap://styles/whitesmoke',
+                    resizeEnable: true,
                 });
 
                 mapInstance.current = map;
-                setIsLoading(false);
+
+                // 地图加载完成
+                map.on('complete', () => {
+                    if (isMounted) {
+                        setIsLoading(false);
+                        setMapReady(true);
+                    }
+                });
 
                 // 添加控件
                 map.addControl(new AMap.Scale());
-                map.addControl(new AMap.ToolBar({ position: 'RB' }));
+                map.addControl(new AMap.ToolBar({
+                    position: 'RB',
+                    liteStyle: true,
+                }));
 
             } catch (err) {
                 console.error('Map init error:', err);
-                setError('地图加载失败');
-                setIsLoading(false);
+                if (isMounted) {
+                    setError(err instanceof Error ? err.message : '地图加载失败');
+                    setIsLoading(false);
+                }
             }
         };
 
         initMap();
 
         return () => {
+            isMounted = false;
             if (mapInstance.current) {
                 mapInstance.current.destroy();
+                mapInstance.current = null;
             }
         };
     }, []);
 
-    // 当 dailyPlan 更新时，重新绘制标记和路线
-    useEffect(() => {
-        if (!mapInstance.current || !dailyPlan || dailyPlan.length === 0) return;
-
+    // 绘制标记和路线
+    const drawMarkersAndRoutes = useCallback(() => {
         const map = mapInstance.current;
-        const AMap = window.AMap;
+        const AMap = AMapRef.current;
+
+        if (!map || !AMap || !dailyPlan || dailyPlan.length === 0) return;
 
         // 清除所有覆盖物
         map.clearMap();
@@ -97,65 +120,51 @@ export default function MapContainer({ dailyPlan }: MapContainerProps) {
 
         dailyPlan.forEach((day, dayIndex) => {
             const color = dayColors[dayIndex % dayColors.length];
-            const pathPoints: [number, number][] = [];
+            const pathPoints: any[] = [];
 
             day.routes.forEach((route, routeIndex) => {
-                const position: [number, number] = [route.longitude, route.latitude];
-                pathPoints.push(position);
+                const lnglat = new AMap.LngLat(route.longitude, route.latitude);
+                pathPoints.push(lnglat);
 
-                // 创建自定义标记
-                const markerContent = `
-          <div style="
-            position: relative;
-            width: 36px;
-            height: 36px;
-          ">
-            <div style="
-              width: 36px;
-              height: 36px;
+                // 创建标记
+                const marker = new AMap.Marker({
+                    position: lnglat,
+                    title: route.name,
+                    label: {
+                        content: `<div style="
               background: ${color};
-              border-radius: 50% 50% 50% 0;
-              transform: rotate(-45deg);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              border: 3px solid white;
-            ">
-              <span style="
-                transform: rotate(45deg);
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-              ">${routeIndex + 1}</span>
-            </div>
+              color: white;
+              padding: 4px 8px;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: bold;
+              white-space: nowrap;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            ">D${day.day}-${routeIndex + 1}</div>`,
+                        direction: 'top',
+                        offset: new AMap.Pixel(0, -5),
+                    },
+                });
+
+                // 创建信息窗口内容
+                const infoContent = `
+          <div style="padding: 12px; min-width: 200px; max-width: 280px;">
+            <h3 style="margin: 0 0 8px 0; color: ${color}; font-size: 16px; font-weight: bold;">
+              Day ${day.day} - ${route.name}
+            </h3>
+            <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.5;">
+              ${route.desc}
+            </p>
           </div>
         `;
 
-                const marker = new AMap.Marker({
-                    position: position,
-                    content: markerContent,
-                    offset: new AMap.Pixel(-18, -36),
-                    title: route.name,
-                });
-
-                // 添加信息窗口
-                const infoWindow = new AMap.InfoWindow({
-                    content: `
-            <div style="padding: 12px; min-width: 200px;">
-              <h3 style="margin: 0 0 8px 0; color: ${color}; font-size: 16px;">
-                Day ${day.day} - ${route.name}
-              </h3>
-              <p style="margin: 0; color: #666; font-size: 14px; line-height: 1.5;">
-                ${route.desc}
-              </p>
-            </div>
-          `,
-                    offset: new AMap.Pixel(0, -40),
-                });
-
+                // 点击标记显示信息窗口
                 marker.on('click', () => {
-                    infoWindow.open(map, position);
+                    const infoWindow = new AMap.InfoWindow({
+                        content: infoContent,
+                        offset: new AMap.Pixel(0, -30),
+                    });
+                    infoWindow.open(map, lnglat);
                 });
 
                 map.add(marker);
@@ -167,11 +176,12 @@ export default function MapContainer({ dailyPlan }: MapContainerProps) {
                 const polyline = new AMap.Polyline({
                     path: pathPoints,
                     strokeColor: color,
-                    strokeWeight: 4,
+                    strokeWeight: 5,
                     strokeOpacity: 0.8,
                     strokeStyle: 'solid',
                     lineJoin: 'round',
                     lineCap: 'round',
+                    showDir: true,
                 });
                 map.add(polyline);
             }
@@ -179,13 +189,20 @@ export default function MapContainer({ dailyPlan }: MapContainerProps) {
 
         // 自动调整视野
         if (allMarkers.length > 0) {
-            map.setFitView(allMarkers, false, [60, 60, 60, 60]);
+            map.setFitView(allMarkers, false, [80, 80, 80, 80]);
         }
     }, [dailyPlan]);
 
+    // 当 dailyPlan 更新且地图就绪时，重新绘制
+    useEffect(() => {
+        if (mapReady && dailyPlan && dailyPlan.length > 0) {
+            drawMarkersAndRoutes();
+        }
+    }, [mapReady, dailyPlan, drawMarkersAndRoutes]);
+
     return (
         <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-            <div ref={mapRef} className="w-full h-full" />
+            <div ref={mapRef} className="w-full h-full" style={{ minHeight: '300px' }} />
 
             {isLoading && (
                 <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-100 to-primary-200">
@@ -198,16 +215,16 @@ export default function MapContainer({ dailyPlan }: MapContainerProps) {
 
             {error && (
                 <div className="absolute inset-0 flex items-center justify-center bg-red-50">
-                    <div className="text-center">
+                    <div className="text-center p-8">
                         <p className="text-red-500 text-lg mb-2">😔 {error}</p>
-                        <p className="text-red-400 text-sm">请检查网络连接后刷新页面</p>
+                        <p className="text-red-400 text-sm">请检查高德地图 API Key 配置</p>
                     </div>
                 </div>
             )}
 
             {/* 图例 */}
-            {dailyPlan.length > 0 && (
-                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl p-3 shadow-lg">
+            {dailyPlan && dailyPlan.length > 0 && !isLoading && !error && (
+                <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg z-10">
                     <p className="text-xs text-gray-500 mb-2 font-medium">路线图例</p>
                     <div className="flex flex-wrap gap-2">
                         {dailyPlan.map((day, index) => (

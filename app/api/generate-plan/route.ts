@@ -137,10 +137,12 @@ export async function POST(request: NextRequest) {
         }
 
         const tripData = result.data.outputs.text;
+        const workflowRunId = result.workflow_run_id || result.data?.id;
 
         return NextResponse.json({
             success: true,
             data: tripData,
+            workflow_run_id: workflowRunId,
         });
 
     } catch (error) {
