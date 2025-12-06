@@ -84,3 +84,44 @@
 .delay-700 {
   animation-delay: 700ms;
 }
+
+/* 自定义滚动条类 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 高德地图信息窗口深色主题 */
+.amap-info-contentContainer {
+  background: #1e293b !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.amap-info-content {
+  background: transparent !important;
+}
+
+.amap-info-close {
+  color: #94a3b8 !important;
+}
+
+/* Next.js Image 优化 */
+.next-image-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
