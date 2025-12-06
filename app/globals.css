@@ -50,3 +50,37 @@
   background-color: rgba(34, 211, 238, 0.3);
   color: white;
 }
+
+/* Glassmorphism Utilities */
+.glass {
+  @apply bg-white/10 backdrop-blur-xl border border-white/20;
+}
+
+.glass-hover {
+  @apply hover:bg-white/20 transition-all duration-300;
+}
+
+.glass-card {
+  @apply bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-xl;
+}
+
+/* Delay utilities */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+.delay-500 {
+  animation-delay: 500ms;
+}
+
+.delay-700 {
+  animation-delay: 700ms;
+}

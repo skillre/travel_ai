@@ -22,6 +22,9 @@ module.exports = {
             animation: {
                 'gradient': 'gradient 8s linear infinite',
                 'float': 'float 3s ease-in-out infinite',
+                'fade-in': 'fadeIn 0.8s ease-out forwards',
+                'fade-in-up': 'fadeInUp 0.8s ease-out forwards',
+                'glow': 'glow 2s ease-in-out infinite',
             },
             keyframes: {
                 gradient: {
@@ -37,6 +40,18 @@ module.exports = {
                 float: {
                     '0%, 100%': { transform: 'translateY(0)' },
                     '50%': { transform: 'translateY(-10px)' },
+                },
+                fadeIn: {
+                    '0%': { opacity: '0' },
+                    '100%': { opacity: '1' },
+                },
+                fadeInUp: {
+                    '0%': { opacity: '0', transform: 'translateY(20px)' },
+                    '100%': { opacity: '1', transform: 'translateY(0)' },
+                },
+                glow: {
+                    '0%, 100%': { boxShadow: '0 0 5px rgba(34, 211, 238, 0.5), 0 0 20px rgba(34, 211, 238, 0.3)' }, // cyan-400
+                    '50%': { boxShadow: '0 0 20px rgba(34, 211, 238, 0.8), 0 0 40px rgba(34, 211, 238, 0.5)' },
                 },
             },
         },
