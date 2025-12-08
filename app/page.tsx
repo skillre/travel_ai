@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import HeroSection from './components/HeroSection';
 import Header from './components/Header';
 import TripResults from './components/TripResults';
+import GeneratingOverlay from './components/GeneratingOverlay';
 
 // 动态导入历史记录面板
 const HistoryPanel = dynamic(() => import('./components/HistoryPanel'), {
@@ -16,18 +17,33 @@ interface Route {
     desc: string;
     latitude: number;
     longitude: number;
+    time_period?: string;
+    emoji?: string;
+    tags?: string[];
+    food_recommendation?: string;
+    tips?: string;
+    cost?: number;
 }
 
 interface DailyPlan {
     day: number;
+    theme?: string;
     routes: Route[];
 }
 
 interface TripData {
     city: string;
-    total_days: number;
-    trip_overview: string;
+    total_days?: number;
+    trip_title?: string;
+    trip_overview?: string;
+    trip_vibe?: string;
     daily_plan: DailyPlan[];
+}
+
+interface ProgressState {
+    progress: number;
+    message: string;
+    step: string;
 }
 
 export default function Home() {
@@ -39,7 +55,14 @@ export default function Home() {
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-    const handleGenerate = async (overrideQuery?: string) => {
+    // 进度状态
+    const [progressState, setProgressState] = useState<ProgressState>({
+        progress: 0,
+        message: '准备中...',
+        step: 'connecting'
+    });
+
+    const handleGenerate = useCallback(async (overrideQuery?: string) => {
         const searchQuery = overrideQuery || query;
         if (!searchQuery.trim()) {
             setError('请输入您的旅行需求');
@@ -48,6 +71,7 @@ export default function Home() {
 
         setIsLoading(true);
         setError(null);
+        setProgressState({ progress: 0, message: '准备中...', step: 'connecting' });
 
         try {
             const response = await fetch('/api/generate-plan', {
@@ -58,20 +82,62 @@ export default function Home() {
                 body: JSON.stringify({ context: searchQuery }),
             });
 
-            const result = await response.json();
-
             if (!response.ok) {
-                throw new Error(result.error || '生成失败');
+                throw new Error('请求失败');
             }
 
-            setTripData(result.data);
-            setWorkflowRunId(result.workflow_run_id || null);
+            const reader = response.body?.getReader();
+            if (!reader) {
+                throw new Error('无法读取响应');
+            }
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+
+                // 处理 SSE 数据
+                const lines = buffer.split('\n\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const event = JSON.parse(line.slice(6));
+
+                            if (event.type === 'progress') {
+                                setProgressState({
+                                    progress: event.progress,
+                                    message: event.message,
+                                    step: event.step
+                                });
+                            } else if (event.type === 'complete') {
+                                setTripData(event.data);
+                                setWorkflowRunId(event.workflow_run_id || null);
+                                setProgressState({
+                                    progress: 100,
+                                    message: '完成！',
+                                    step: 'finalizing'
+                                });
+                            } else if (event.type === 'error') {
+                                throw new Error(event.error);
+                            }
+                        } catch (parseError) {
+                            // 忽略解析错误，继续处理
+                        }
+                    }
+                }
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : '生成行程失败，请稍后重试');
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [query]);
 
     const handleSelectHistory = async (pageId: string) => {
         setIsLoadingHistory(true);
@@ -91,12 +157,6 @@ export default function Home() {
             setError(err instanceof Error ? err.message : '加载历史记录失败');
         } finally {
             setIsLoadingHistory(false);
-        }
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !isLoading) {
-            handleGenerate();
         }
     };
 
@@ -137,9 +197,17 @@ export default function Home() {
                 )}
             </div>
 
+            {/* 生成进度遮罩 */}
+            <GeneratingOverlay
+                isVisible={isLoading}
+                progress={progressState.progress}
+                message={progressState.message}
+                step={progressState.step}
+            />
+
             {/* 全局 Loading 遮罩 for history */}
             {isLoadingHistory && (
-                <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center animate-fade-in">
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center animate-fade-in">
                     <div className="flex flex-col items-center gap-6 p-8 rounded-3xl bg-slate-900/90 border border-white/10 shadow-2xl">
                         <div className="relative">
                             <div className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
