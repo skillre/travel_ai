@@ -139,11 +139,16 @@ export default function Home() {
     };
 
     return (
-        <main className="min-h-screen bg-slate-950 text-white selection:bg-cyan-500/30 selection:text-white overflow-hidden relative">
-            {/* 动态背景 */}
+        <main className="min-h-screen bg-cream-50 text-slate-800 selection:bg-tender-blue-200 selection:text-slate-900 overflow-hidden relative font-sans">
+            {/* 动态背景 - 清新温柔风 */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black" />
-                <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-cyan-900/10 to-transparent opacity-50" />
+                <div className="absolute inset-0 bg-gradient-to-br from-cream-50 via-tender-blue-50/50 to-soft-pink-50/30 animate-gradient bg-[length:200%_200%]" />
+                <div className="absolute top-0 inset-x-0 h-[600px] bg-gradient-to-b from-white/80 via-white/20 to-transparent" />
+
+                {/* 装饰性光晕 */}
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-tender-blue-200/30 rounded-full blur-[100px] animate-float-slow" />
+                <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-soft-pink-100/40 rounded-full blur-[120px] animate-float-delayed" />
+
                 {/* 仅在首页（非结果页）显示粒子背景 */}
                 {!tripData && <ParticleBackground />}
             </div>

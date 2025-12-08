@@ -41,14 +41,21 @@ export default function ParticleBackground() {
         // 初始化粒子
         const initParticles = () => {
             particles = [];
+            const colors = [
+                (opacity: number) => `rgba(56, 136, 179, ${opacity})`,  // Gentle Blue
+                (opacity: number) => `rgba(52, 168, 83, ${opacity})`,   // Fresh Green
+                (opacity: number) => `rgba(255, 150, 150, ${opacity})`  // Soft Pink
+            ];
+
             for (let i = 0; i < PARTICLE_COUNT; i++) {
+                const colorFn = colors[Math.floor(Math.random() * colors.length)];
                 particles.push({
                     x: Math.random() * canvas.width,
                     y: Math.random() * canvas.height,
-                    vx: (Math.random() - 0.5) * 0.5,
-                    vy: (Math.random() - 0.5) * 0.5,
-                    size: Math.random() * 2 + 1,
-                    color: `rgba(34, 211, 238, ${Math.random() * 0.5 + 0.1})` // Cyan 色系
+                    vx: (Math.random() - 0.5) * 0.3,
+                    vy: (Math.random() - 0.5) * 0.3,
+                    size: Math.random() * 3 + 1,
+                    color: colorFn(Math.random() * 0.4 + 0.1)
                 });
             }
         };
@@ -98,7 +105,7 @@ export default function ParticleBackground() {
 
                     if (dist < CONNECT_DISTANCE) {
                         ctx.beginPath();
-                        ctx.strokeStyle = `rgba(34, 211, 238, ${0.15 * (1 - dist / CONNECT_DISTANCE)})`;
+                        ctx.strokeStyle = `rgba(100, 116, 139, ${0.1 * (1 - dist / CONNECT_DISTANCE)})`;
                         ctx.lineWidth = 1;
                         ctx.moveTo(p.x, p.y);
                         ctx.lineTo(p2.x, p2.y);

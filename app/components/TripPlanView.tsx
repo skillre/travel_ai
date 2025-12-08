@@ -10,10 +10,10 @@ import TimelineView from './TimelineView';
 const MapContainerNew = dynamic(() => import('./MapContainerNew'), {
     ssr: false,
     loading: () => (
-        <div className="w-full h-full flex items-center justify-center bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-white/5">
+        <div className="w-full h-full flex items-center justify-center bg-white/50 backdrop-blur-sm rounded-2xl border border-white/20">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-10 h-10 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-cyan-400 text-sm font-medium">地图加载中...</p>
+                <div className="w-10 h-10 border-3 border-tender-blue-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-tender-blue-500 text-sm font-medium">地图加载中...</p>
             </div>
         </div>
     ),
@@ -68,7 +68,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
             <div className="flex-1 flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 min-h-0">
                 {/* 时光轴列表区域 */}
                 <div className="order-2 md:order-1 h-[50%] md:h-full md:w-[420px] lg:w-[480px] shrink-0">
-                    <div className="glass-card rounded-2xl md:rounded-3xl overflow-hidden h-full border border-white/10 shadow-2xl">
+                    <div className="bg-white/40 backdrop-blur-xl rounded-2xl md:rounded-3xl overflow-hidden h-full border border-white/60 shadow-glass">
                         <TimelineView
                             timeline={tripPlan.timeline}
                             city={tripPlan.meta.city}
@@ -79,7 +79,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                 </div>
 
                 {/* 地图区域 */}
-                <div className="order-1 md:order-2 flex-1 relative h-[50%] md:h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+                <div className="order-1 md:order-2 flex-1 relative h-[50%] md:h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-soft border border-white/60 bg-white/50">
                     <div className="absolute inset-0 z-0">
                         <MapContainerNew
                             ref={mapRef}
@@ -87,8 +87,8 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                             onMarkerClick={handleMarkerClick}
                         />
                     </div>
-                    {/* 装饰性阴影 */}
-                    <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] rounded-2xl md:rounded-3xl" />
+                    {/* 装饰性阴影 - 更轻柔 */}
+                    <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.05)] rounded-2xl md:rounded-3xl" />
                 </div>
             </div>
         </div>

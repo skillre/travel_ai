@@ -42,7 +42,7 @@ export default function ResultHeroSection({ meta }: ResultHeroSectionProps) {
     }, [meta.city]);
 
     return (
-        <div className="relative w-full h-64 md:h-80 overflow-hidden rounded-2xl md:rounded-3xl">
+        <div className="relative w-full h-64 md:h-80 overflow-hidden rounded-2xl md:rounded-3xl shadow-soft group">
             {/* 背景图 */}
             {backgroundImage ? (
                 <Image
@@ -50,59 +50,58 @@ export default function ResultHeroSection({ meta }: ResultHeroSectionProps) {
                     alt={meta.city}
                     fill
                     priority
-                    className="object-cover"
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
                     sizes="100vw"
                 />
             ) : (
-                <div className={`absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 ${isLoading ? 'animate-pulse' : ''}`} />
+                <div className={`absolute inset-0 bg-gradient-to-br from-tender-blue-100 to-cream-100 ${isLoading ? 'animate-pulse' : ''}`} />
             )}
 
-            {/* 渐变遮罩 */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+            {/* 渐变遮罩 - 更轻柔 */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 
             {/* 内容区域 */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
                 {/* 标题 */}
-                <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 drop-shadow-lg">
+                <h1 className="text-3xl md:text-5xl font-bold text-white mb-3 drop-shadow-md tracking-tight">
                     {meta.trip_title}
                 </h1>
 
                 {/* 副标题 (斜体) */}
-                <p className="text-lg md:text-xl text-white/80 italic max-w-2xl mb-8 drop-shadow-md">
+                <p className="text-lg md:text-xl text-white/90 italic max-w-2xl mb-8 drop-shadow-sm font-light">
                     &ldquo;{meta.trip_vibe}&rdquo;
                 </p>
             </div>
 
-            {/* 底部毛玻璃信息条 */}
-            <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="mx-auto max-w-3xl bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 px-6 py-4 shadow-2xl">
+            {/* 底部毛玻璃信息条 - Light Glass */}
+            <div className="absolute bottom-4 left-4 right-4">
+                <div className="mx-auto max-w-4xl bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 px-6 py-4 shadow-glass">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                         {/* 预估费用 */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                                <Coins className="w-5 h-5 text-emerald-400" />
+                            <div className="w-10 h-10 rounded-xl bg-fresh-green-100 flex items-center justify-center text-fresh-green-600">
+                                <Coins className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-xs text-white/60 uppercase tracking-wider">预估人均</p>
-                                <p className="text-xl font-bold text-white">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">预估人均</p>
+                                <p className="text-xl font-bold text-slate-800">
                                     ¥{meta.total_estimated_cost}
                                 </p>
                             </div>
                         </div>
 
                         {/* 分隔线 */}
-                        <div className="hidden md:block w-px h-12 bg-white/20" />
+                        <div className="hidden md:block w-px h-10 bg-slate-200" />
 
                         {/* 贴士 - 跑马灯效果 */}
-                        <div className="flex-1 flex items-center gap-3 overflow-hidden">
-                            <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                                <Lightbulb className="w-5 h-5 text-amber-400" />
+                        <div className="flex-1 flex items-center gap-3 overflow-hidden w-full md:w-auto">
+                            <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-500">
+                                <Lightbulb className="w-5 h-5" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-xs text-white/60 uppercase tracking-wider">贴士</p>
-                                <div className="relative overflow-hidden">
-                                    <p className="text-white/90 text-sm whitespace-nowrap animate-marquee">
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">贴士</p>
+                                <div className="relative overflow-hidden w-full">
+                                    <p className="text-slate-700 text-sm whitespace-nowrap animate-marquee font-medium">
                                         💡 {meta.suggestion}
                                     </p>
                                 </div>
