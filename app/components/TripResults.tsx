@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRef, useCallback } from 'react';
 import ItineraryList from './ItineraryList';
 import { MapContainerRef } from './MapContainer';
+import { TripData, isNewTripPlan, TripPlan, LegacyTripData } from '../types';
 
 // 动态导入地图组件，禁用 SSR
 const MapContainer = dynamic(() => import('./MapContainer'), {
@@ -18,59 +19,56 @@ const MapContainer = dynamic(() => import('./MapContainer'), {
     ),
 });
 
-interface Route {
-    time_period?: string;
-    name: string;
-    desc: string;
-    latitude: number;
-    longitude: number;
-    suggested_duration?: string;
-    emoji?: string;
-    tags?: string[];
-    food_recommendation?: string;
-    tips?: string;
-    cost?: number;
-}
-
-interface DailyPlan {
-    day: number;
-    theme?: string;
-    routes: Route[];
-}
-
-interface TripData {
-    city: string;
-    total_days?: number;
-    trip_title?: string;
-    trip_overview?: string;
-    trip_vibe?: string;
-    daily_plan: DailyPlan[];
-}
+// 动态导入新版视图组件
+const TripPlanView = dynamic(() => import('./TripPlanView'), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-full flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-3 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-cyan-400 text-sm font-medium">加载中...</p>
+            </div>
+        </div>
+    ),
+});
 
 interface TripResultsProps {
     tripData: TripData;
 }
 
+/**
+ * 旅行结果展示组件
+ * 支持新旧两种数据格式：
+ * - 新格式 (TripPlan): 使用 TripPlanView 渲染
+ * - 旧格式 (LegacyTripData): 使用现有的 ItineraryList + MapContainer
+ */
 export default function TripResults({ tripData }: TripResultsProps) {
     const mapRef = useRef<MapContainerRef>(null);
 
-    // 处理卡片悬停
+    // 处理卡片悬停 (旧版)
     const handleSpotHover = useCallback((dayIndex: number, spotIndex: number) => {
         mapRef.current?.highlightSpot(dayIndex, spotIndex);
     }, []);
 
-    // 处理卡片点击
+    // 处理卡片点击 (旧版)
     const handleSpotClick = useCallback((dayIndex: number, spotIndex: number) => {
         mapRef.current?.panToSpot(dayIndex, spotIndex);
     }, []);
 
-    // 处理地图标记点击
+    // 处理地图标记点击 (旧版)
     const handleMarkerClick = useCallback((dayIndex: number, spotIndex: number) => {
-        // 可以添加滚动到对应卡片的逻辑
         console.log('Marker clicked:', dayIndex, spotIndex);
     }, []);
 
-    const totalDays = tripData.total_days || tripData.daily_plan.length;
+    // 检测数据格式并选择对应渲染方式
+    if (isNewTripPlan(tripData)) {
+        // 新格式：使用 TripPlanView
+        return <TripPlanView tripPlan={tripData as TripPlan} />;
+    }
+
+    // 旧格式：使用现有组件
+    const legacyData = tripData as LegacyTripData;
+    const totalDays = legacyData.total_days || legacyData.daily_plan.length;
 
     return (
         <div className="flex flex-col md:flex-row h-full absolute inset-0 md:p-6 gap-4 md:gap-6 animate-fade-in-up delay-200">
@@ -78,10 +76,10 @@ export default function TripResults({ tripData }: TripResultsProps) {
             <div className="order-2 md:order-1 h-[50%] md:h-full md:w-[420px] lg:w-[480px] shrink-0 flex flex-col">
                 <div className="glass-card rounded-2xl md:rounded-3xl overflow-hidden flex flex-col h-full border border-white/10 shadow-2xl">
                     <ItineraryList
-                        dailyPlan={tripData.daily_plan}
-                        city={tripData.city}
-                        tripTitle={tripData.trip_title}
-                        tripVibe={tripData.trip_vibe || tripData.trip_overview}
+                        dailyPlan={legacyData.daily_plan}
+                        city={legacyData.city}
+                        tripTitle={legacyData.trip_title}
+                        tripVibe={legacyData.trip_vibe || legacyData.trip_overview}
                         totalDays={totalDays}
                         onSpotHover={handleSpotHover}
                         onSpotClick={handleSpotClick}
@@ -94,7 +92,7 @@ export default function TripResults({ tripData }: TripResultsProps) {
                 <div className="absolute inset-0 z-0">
                     <MapContainer
                         ref={mapRef}
-                        dailyPlan={tripData.daily_plan}
+                        dailyPlan={legacyData.daily_plan}
                         onMarkerClick={handleMarkerClick}
                     />
                 </div>

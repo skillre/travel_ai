@@ -6,39 +6,12 @@ import HeroSection from './components/HeroSection';
 import Header from './components/Header';
 import TripResults from './components/TripResults';
 import GeneratingOverlay from './components/GeneratingOverlay';
+import { TripData } from './types';
 
 // 动态导入历史记录面板
 const HistoryPanel = dynamic(() => import('./components/HistoryPanel'), {
     ssr: false,
 });
-
-interface Route {
-    name: string;
-    desc: string;
-    latitude: number;
-    longitude: number;
-    time_period?: string;
-    emoji?: string;
-    tags?: string[];
-    food_recommendation?: string;
-    tips?: string;
-    cost?: number;
-}
-
-interface DailyPlan {
-    day: number;
-    theme?: string;
-    routes: Route[];
-}
-
-interface TripData {
-    city: string;
-    total_days?: number;
-    trip_title?: string;
-    trip_overview?: string;
-    trip_vibe?: string;
-    daily_plan: DailyPlan[];
-}
 
 interface ProgressState {
     progress: number;
