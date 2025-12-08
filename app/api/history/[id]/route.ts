@@ -15,22 +15,114 @@ interface NotionPage {
 
 /**
  * 将 Python 风格的字符串（单引号）转换为标准 JSON（双引号）
+ * 使用状态机逻辑智能处理字符串内容中的特殊字符
  */
 function pythonToJson(pythonStr: string): string {
-    // 先处理转义的单引号
-    let result = pythonStr;
+    // 处理 Python 的 True/False/None（先处理，避免被引号替换影响）
+    let result = pythonStr
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null');
 
-    // 替换单引号为双引号
-    // 注意：需要处理值中包含的单引号（如 "Tom's cafe"）
-    result = result.replace(/'/g, '"');
+    // 使用状态机将单引号字符串转换为双引号
+    let output = '';
+    let inString = false;
+    let i = 0;
 
-    // 处理 Python 的 True/False/None
-    result = result.replace(/\bTrue\b/g, 'true');
-    result = result.replace(/\bFalse\b/g, 'false');
-    result = result.replace(/\bNone\b/g, 'null');
+    while (i < result.length) {
+        const char = result[i];
+        const nextChar = result[i + 1];
 
-    return result;
+        if (!inString) {
+            // 不在字符串内
+            if (char === "'") {
+                // 开始一个新字符串
+                output += '"';
+                inString = true;
+            } else {
+                output += char;
+            }
+        } else {
+            // 在字符串内
+            if (char === '\\' && nextChar === "'") {
+                // 转义的单引号 \' -> \"
+                output += '\\"';
+                i++; // 跳过下一个字符
+            } else if (char === '"') {
+                // 字符串内的双引号需要转义
+                output += '\\"';
+            } else if (char === "'") {
+                // 结束字符串
+                output += '"';
+                inString = false;
+            } else if (char === '\n') {
+                // 换行符需要转义
+                output += '\\n';
+            } else if (char === '\r') {
+                // 回车符需要转义
+                output += '\\r';
+            } else if (char === '\t') {
+                // 制表符需要转义
+                output += '\\t';
+            } else {
+                output += char;
+            }
+        }
+        i++;
+    }
+
+    return output;
 }
+
+/**
+ * 尝试多种方式解析可能是 Python 格式的 JSON 字符串
+ */
+function parseFlexibleJson(str: string): any {
+    // 清理字符串
+    let cleanStr = str.trim();
+
+    // 1. 首先尝试直接解析（标准 JSON）
+    try {
+        return JSON.parse(cleanStr);
+    } catch {
+        // 继续尝试其他方法
+    }
+
+    // 2. 尝试 Python 格式转换
+    try {
+        const jsonStr = pythonToJson(cleanStr);
+        return JSON.parse(jsonStr);
+    } catch {
+        // 继续尝试其他方法
+    }
+
+    // 3. 尝试使用 Function 构造器（更宽松的解析）
+    // 这可以处理一些边缘情况，如尾随逗号
+    try {
+        // 移除可能的尾随逗号（JSON 不允许）
+        const noTrailingComma = cleanStr.replace(/,\s*([\]}])/g, '$1');
+        const jsonStr = pythonToJson(noTrailingComma);
+        return JSON.parse(jsonStr);
+    } catch {
+        // 继续尝试其他方法
+    }
+
+    // 4. 最后尝试使用 eval（仅限于看起来像对象的字符串）
+    // 注意：这在服务端是相对安全的，因为数据来自我们自己的 Notion
+    try {
+        if (cleanStr.startsWith('{') || cleanStr.startsWith('[')) {
+            // 使用 Function 而非 eval，稍微安全一些
+            const parsed = new Function('return ' + cleanStr)();
+            // 转换为 JSON 再解析回来，确保是纯 JSON 对象
+            return JSON.parse(JSON.stringify(parsed));
+        }
+    } catch {
+        // 所有方法都失败了
+    }
+
+    throw new Error('无法解析 JSON 字符串');
+}
+
 
 export async function GET(
     request: NextRequest,
@@ -96,24 +188,17 @@ export async function GET(
             }
         }
 
-        // 解析 JSON 字符串
+        // 解析 JSON 字符串（支持标准 JSON 和 Python 格式）
         let planData;
         try {
-            // 首先尝试直接解析（标准 JSON）
-            planData = JSON.parse(planJsonStr);
-        } catch {
-            // 如果失败，尝试将 Python 格式转换为 JSON
-            try {
-                const jsonStr = pythonToJson(planJsonStr);
-                planData = JSON.parse(jsonStr);
-            } catch (parseError) {
-                console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 500));
-                console.error('Parse error:', parseError);
-                return NextResponse.json(
-                    { error: '行程数据格式错误，无法解析' },
-                    { status: 500 }
-                );
-            }
+            planData = parseFlexibleJson(planJsonStr);
+        } catch (parseError) {
+            console.error('Failed to parse PlanJSON:', planJsonStr.substring(0, 500));
+            console.error('Parse error:', parseError);
+            return NextResponse.json(
+                { error: '行程数据格式错误，无法解析' },
+                { status: 500 }
+            );
         }
 
         // 获取标题
