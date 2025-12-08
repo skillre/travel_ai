@@ -13,6 +13,11 @@ const HistoryPanel = dynamic(() => import('./components/HistoryPanel'), {
     ssr: false,
 });
 
+// 动态导入粒子背景 (Canvas 仅客户端)
+const ParticleBackground = dynamic(() => import('./components/ParticleBackground'), {
+    ssr: false,
+});
+
 interface ProgressState {
     progress: number;
     message: string;
@@ -139,6 +144,8 @@ export default function Home() {
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black" />
                 <div className="absolute top-0 left-0 right-0 h-[500px] bg-gradient-to-b from-cyan-900/10 to-transparent opacity-50" />
+                {/* 仅在首页（非结果页）显示粒子背景 */}
+                {!tripData && <ParticleBackground />}
             </div>
 
             {/* 内容区域 */}
