@@ -86,7 +86,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         zoom: 12,
                         center: [118.089, 24.479],
                         resizeEnable: true,
-                        mapStyle: 'amap://styles/darkblue',
+                        mapStyle: 'amap://styles/normal', // Light Style
                     });
 
                     mapInstance.current = map;
@@ -137,6 +137,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const allMarkers: any[] = [];
 
             timeline.forEach((day, dayIndex) => {
+                // Use new gentle colors for lines
                 const color = dayColors[dayIndex % dayColors.length];
                 const pathPoints: any[] = [];
                 const dayMarkers: any[] = [];
@@ -147,19 +148,19 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                     const isFood = item.type === 'food';
 
-                    // 创建差异化标记
+                    // Clean Markers
                     const markerContent = `
-                        <div class="custom-marker ${isFood ? 'food' : 'spot'}" style="
+                        <div class="custom-marker" style="
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            width: 36px;
-                            height: 36px;
+                            width: 40px;
+                            height: 40px;
                             border-radius: 50%;
-                            background: ${isFood ? 'linear-gradient(135deg, #f97316, #ea580c)' : `linear-gradient(135deg, ${color}, ${color}dd)`};
-                            box-shadow: 0 4px 15px ${isFood ? 'rgba(249, 115, 22, 0.5)' : `${color}60`};
-                            border: 3px solid rgba(255,255,255,0.9);
-                            font-size: 18px;
+                            background: white;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+                            border: 3px solid ${isFood ? '#f97316' : '#2dd4bf'};
+                            font-size: 20px;
                             cursor: pointer;
                             transition: transform 0.3s ease;
                         ">
@@ -170,67 +171,48 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     const marker = new AMap.Marker({
                         position: lnglat,
                         content: markerContent,
-                        offset: new AMap.Pixel(-18, -18),
+                        offset: new AMap.Pixel(-20, -20),
+                        zIndex: 100 + itemIndex,
                     });
 
-                    // 标签 (名称)
+                    // 标签 (Bubble Style)
                     const labelContent = `
                         <div style="
-                            background: ${isFood ? 'linear-gradient(135deg, #f97316, #ea580c)' : `linear-gradient(135deg, ${color}, ${color}dd)`};
-                            color: white;
-                            padding: 6px 12px;
-                            border-radius: 20px;
-                            font-size: 12px;
-                            font-weight: bold;
+                            background: white;
+                            color: #334155;
+                            padding: 8px 12px;
+                            border-radius: 8px;
+                            font-size: 13px;
+                            font-weight: 600;
                             white-space: nowrap;
-                            box-shadow: 0 4px 15px ${isFood ? 'rgba(249, 115, 22, 0.5)' : `${color}60`};
-                            border: 2px solid rgba(255,255,255,0.3);
-                        ">${item.emoji || ''} ${item.title}</div>
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                            border: 1px solid #f1f5f9;
+                        ">${item.title}</div>
                     `;
 
                     marker.setLabel({
                         content: labelContent,
                         direction: 'top',
-                        offset: new AMap.Pixel(0, -8),
+                        offset: new AMap.Pixel(0, -10),
                     });
 
-                    // 信息窗口内容
+                    // Info Window (Modern Clean)
                     const infoContent = `
-                        <div style="padding: 16px; min-width: 260px; max-width: 340px; font-family: system-ui;">
-                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                                <span style="font-size: 32px;">${item.emoji || (isFood ? '🍽️' : '📍')}</span>
-                                <div>
-                                    <h3 style="margin: 0; color: ${isFood ? '#f97316' : color}; font-size: 18px; font-weight: bold;">
-                                        ${item.title}
-                                    </h3>
-                                    <span style="font-size: 12px; color: #888;">Day ${day.day} · ${item.time_label}</span>
-                                </div>
-                            </div>
-                            <p style="margin: 0 0 12px 0; color: #555; font-size: 14px; line-height: 1.6;">
-                                ${item.content.desc}
+                        <div style="padding: 16px; min-width: 260px; font-family: system-ui;">
+                            <h3 style="margin: 0 0 4px 0; color: #1e293b; font-size: 16px; font-weight: bold;">
+                                ${item.title}
+                            </h3>
+                            <div style="font-size: 12px; color: #64748b; margin-bottom: 8px;">Day ${day.day} · ${item.time_label}</div>
+                            <p style="margin: 0; color: #475569; font-size: 13px; line-height: 1.5;">
+                                ${item.content.desc.substring(0, 60)}...
                             </p>
-                            ${item.content.highlight_text ? `
-                                <div style="display: flex; align-items: flex-start; gap: 8px; padding: 10px; background: ${isFood ? '#fff7ed' : '#fffbeb'}; border-radius: 10px; margin-bottom: 10px;">
-                                    <span>${isFood ? '🍽️' : '⚠️'}</span>
-                                    <div style="font-size: 13px;">
-                                        <strong style="color: ${isFood ? '#ea580c' : '#d97706'};">${item.content.highlight_label}:</strong>
-                                        <span style="color: #666;"> ${item.content.highlight_text}</span>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            ${item.cost > 0 ? `
-                                <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: ${isFood ? '#fff7ed' : '#f0fdf4'}; border-radius: 20px;">
-                                    <span>💰</span>
-                                    <span style="font-size: 14px; color: ${isFood ? '#ea580c' : '#16a34a'}; font-weight: bold;">¥${item.cost}</span>
-                                </div>
-                            ` : ''}
                         </div>
                     `;
 
                     marker.on('click', () => {
                         const infoWindow = new AMap.InfoWindow({
                             content: infoContent,
-                            offset: new AMap.Pixel(0, -40),
+                            offset: new AMap.Pixel(0, -45),
                         });
                         infoWindow.open(map, lnglat);
                         onMarkerClick?.(dayIndex, itemIndex);
@@ -243,17 +225,18 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                 markersRef.current.push(dayMarkers);
 
-                // 绘制路线
+                // 绘制路线 - Gentle Teal Lines
                 if (pathPoints.length > 1) {
                     const polyline = new AMap.Polyline({
                         path: pathPoints,
-                        strokeColor: color,
-                        strokeWeight: 5,
+                        strokeColor: '#2dd4bf', // Teal-400
+                        strokeWeight: 6,
                         strokeOpacity: 0.8,
                         strokeStyle: 'solid',
                         lineJoin: 'round',
                         lineCap: 'round',
                         showDir: true,
+                        zIndex: 50,
                     });
                     map.add(polyline);
                 }
@@ -271,51 +254,38 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         }, [mapReady, timeline, drawMarkersAndRoutes]);
 
         return (
-            <div className="relative w-full h-full">
-                <div ref={mapRef} className="w-full h-full" style={{ minHeight: '300px' }} />
+            <div className="relative w-full h-full bg-slate-50">
+                <div ref={mapRef} className="w-full h-full" style={{ minHeight: '300px', background: '#f8fafc' }} />
 
                 {isLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-50">
                         <div className="flex flex-col items-center gap-4">
-                            <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-cyan-400 font-medium">地图加载中...</p>
+                            <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-teal-600 font-medium text-sm">Loading Map...</p>
                         </div>
                     </div>
                 )}
 
                 {error && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/90">
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-50">
                         <div className="text-center p-8">
-                            <p className="text-red-400 text-lg mb-2">😔 {error}</p>
-                            <p className="text-slate-500 text-sm">请检查高德地图 API Key 配置</p>
+                            <p className="text-red-500 text-sm mb-2">😔 {error}</p>
                         </div>
                     </div>
                 )}
 
-                {/* 图例 */}
+                {/* Floating Legend - Light Glass */}
                 {timeline && timeline.length > 0 && !isLoading && !error && (
-                    <div className="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur-md rounded-xl p-3 shadow-xl border border-white/10 z-10">
-                        <p className="text-xs text-slate-400 mb-2 font-medium">图例</p>
-                        <div className="flex flex-wrap gap-3">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-4 h-4 rounded-full bg-cyan-500 flex items-center justify-center text-[10px]">📍</div>
-                                <span className="text-xs text-slate-300">景点</span>
+                    <div className="absolute bottom-6 left-6 bg-white/90 backdrop-blur-md rounded-xl p-4 shadow-xl border border-slate-100 z-10 transition-all hover:scale-105 cursor-default">
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-teal-400"></div>
+                                <span className="text-xs text-slate-600 font-bold">Spot</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-[10px]">🍽️</div>
-                                <span className="text-xs text-slate-300">美食</span>
+                            <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                <span className="text-xs text-slate-600 font-bold">Food</span>
                             </div>
-                        </div>
-                        <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-2">
-                            {timeline.map((day, index) => (
-                                <div key={day.day} className="flex items-center gap-1.5">
-                                    <div
-                                        className="w-3 h-3 rounded-full"
-                                        style={{ backgroundColor: dayColors[index % dayColors.length] }}
-                                    />
-                                    <span className="text-xs text-slate-300">Day {day.day}</span>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 )}

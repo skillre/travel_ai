@@ -63,31 +63,29 @@ export default function TimelineView({
     );
 
     return (
-        <div className="h-full flex flex-col overflow-hidden bg-white/30 backdrop-blur-sm">
-            {/* 顶部统计栏 - Light Glass */}
-            <div className="shrink-0 p-4 border-b border-white/60 bg-white/60 backdrop-blur-xl shadow-sm z-30">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <CalendarDays className="w-5 h-5 text-tender-blue-500" />
-                        <span className="text-slate-700 font-bold">{timeline.length} 天行程</span>
+        <div className="h-full flex flex-col">
+            {/* 顶部统计栏 - Minimalist Border Bottom */}
+            <div className="shrink-0 py-3 px-6 md:px-8 border-b border-slate-100 bg-white sticky top-0 z-30 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
+                    <span className="text-slate-800 font-bold">{timeline.length} Days</span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-medium">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md text-slate-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                        <span>{totalSpots} Spots</span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm font-medium">
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-tender-blue-400" />
-                            <span className="text-slate-500">{totalSpots} 景点</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-orange-400" />
-                            <span className="text-slate-500">{totalFood} 美食</span>
-                        </div>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md text-slate-500">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                        <span>{totalFood} Foods</span>
                     </div>
                 </div>
             </div>
 
-            {/* 可滚动时光轴 */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-8">
+            {/* 列表内容 (无需 scrollbar，由父级控制) */}
+            <div className="flex-1 px-6 md:px-8 py-6 space-y-12">
                 {timeline.map((day, dayIndex) => {
-                    const dayColor = dayColors[dayIndex % dayColors.length]; // You might want to update dayColors palette too
+                    const dayColor = dayColors[dayIndex % dayColors.length];
 
                     return (
                         <div
@@ -95,22 +93,16 @@ export default function TimelineView({
                             className="relative animate-fade-in-up"
                             style={{ animationDelay: `${dayIndex * 100}ms` }}
                         >
-                            {/* Day Header - Floating Glass */}
-                            <div className="sticky top-0 z-20 flex items-center gap-4 mb-6 bg-white/90 backdrop-blur-xl py-3 px-4 -mx-4 rounded-xl border border-white/60 shadow-soft">
-                                {/* 天数徽章 */}
-                                <div
-                                    className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center text-white font-bold shadow-lg transform transition-transform hover:scale-105"
-                                    style={{
-                                        backgroundColor: dayColor,
-                                        boxShadow: `0 8px 20px -4px ${dayColor}60`,
-                                    }}
-                                >
-                                    <span className="text-[10px] opacity-90 uppercase tracking-wider">DAY</span>
-                                    <span className="text-2xl -mt-1 font-black">{day.day}</span>
+                            {/* Day Header - Clean Sticky */}
+                            <div className="sticky top-[49px] z-20 flex items-center gap-4 mb-8 bg-white/95 backdrop-blur-sm py-4 -mx-2 px-2 border-b border-slate-50">
+                                {/* 天数徽章 - Clean */}
+                                <div className="flex flex-col items-center">
+                                    <span className="text-xs text-slate-400 font-bold tracking-wider">DAY</span>
+                                    <span className="text-3xl font-black text-slate-800 leading-none">{day.day}</span>
                                 </div>
 
                                 {/* 主题信息 */}
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 pl-2 border-l-2 border-slate-100 ml-2">
                                     <h3 className="text-slate-800 font-bold text-lg truncate">
                                         {day.date_theme}
                                     </h3>
@@ -118,21 +110,13 @@ export default function TimelineView({
                                         {day.day_summary}
                                     </p>
                                 </div>
-
-                                {/* 项目数量 */}
-                                <div className="shrink-0 flex items-center gap-2">
-                                    <span className="px-3 py-1 bg-slate-100 rounded-full text-xs text-slate-500 font-medium">
-                                        {day.items.length} 项
-                                    </span>
-                                    <ChevronRight className="w-5 h-5 text-slate-400" />
-                                </div>
                             </div>
 
+                            {/* 时间轴线 */}
+                            <div className="absolute left-[18px] top-[80px] bottom-0 w-0.5 bg-slate-100 z-0" />
+
                             {/* 时间轴 + 卡片列表 */}
-                            <div
-                                className="relative pl-6 ml-6 border-l-2 border-dashed space-y-6"
-                                style={{ borderColor: `${dayColor}40` }}
-                            >
+                            <div className="relative space-y-8 pl-2">
                                 {day.items.map((item, itemIndex) => (
                                     <ItemCard
                                         key={itemIndex}
@@ -150,10 +134,10 @@ export default function TimelineView({
                 })}
 
                 {/* 结束标记 */}
-                <div className="text-center py-8">
-                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-white/60 rounded-full border border-white/60 shadow-sm">
-                        <span className="text-2xl animate-bounce">🎉</span>
-                        <span className="text-slate-500 font-medium">旅程规划完成</span>
+                <div className="text-center py-12">
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-full text-slate-400 text-sm">
+                        <span>End of Trip</span>
+                        <span>✨</span>
                     </div>
                 </div>
             </div>

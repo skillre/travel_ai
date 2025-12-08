@@ -58,17 +58,16 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     }, []);
 
     return (
-        <div className="flex flex-col h-full animate-fade-in-up">
-            {/* 顶部 Hero 区域 */}
-            <div className="shrink-0 px-4 md:px-6 pt-4 md:pt-6">
-                <ResultHeroSection meta={tripPlan.meta} />
-            </div>
+        <div className="h-screen w-screen flex bg-slate-50 overflow-hidden">
+            {/* Left Panel: Content (Scrollable) */}
+            <div className="w-full md:w-[480px] lg:w-[500px] shrink-0 h-full flex flex-col bg-white border-r border-slate-200 shadow-2xl z-20 overflow-y-auto">
+                {/* Scrollable Content Container */}
+                <div className="flex flex-col min-h-min pb-20">
+                    {/* Header Section */}
+                    <ResultHeroSection meta={tripPlan.meta} />
 
-            {/* 主内容区域：时光轴 + 地图 */}
-            <div className="flex-1 flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 min-h-0">
-                {/* 时光轴列表区域 */}
-                <div className="order-2 md:order-1 h-[50%] md:h-full md:w-[420px] lg:w-[480px] shrink-0">
-                    <div className="bg-white/40 backdrop-blur-xl rounded-2xl md:rounded-3xl overflow-hidden h-full border border-white/60 shadow-glass">
+                    {/* Timeline Container */}
+                    <div className="flex-1">
                         <TimelineView
                             timeline={tripPlan.timeline}
                             city={tripPlan.meta.city}
@@ -77,19 +76,15 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         />
                     </div>
                 </div>
+            </div>
 
-                {/* 地图区域 */}
-                <div className="order-1 md:order-2 flex-1 relative h-[50%] md:h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-soft border border-white/60 bg-white/50">
-                    <div className="absolute inset-0 z-0">
-                        <MapContainerNew
-                            ref={mapRef}
-                            timeline={tripPlan.timeline}
-                            onMarkerClick={handleMarkerClick}
-                        />
-                    </div>
-                    {/* 装饰性阴影 - 更轻柔 */}
-                    <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.05)] rounded-2xl md:rounded-3xl" />
-                </div>
+            {/* Right Panel: Map (Fixed) */}
+            <div className="hidden md:block flex-1 h-full relative z-0 bg-slate-100">
+                <MapContainerNew
+                    ref={mapRef}
+                    timeline={tripPlan.timeline}
+                    onMarkerClick={handleMarkerClick}
+                />
             </div>
         </div>
     );
