@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, CalendarDays } from 'lucide-react';
 import { TripPlanDay, TripPlanItem } from '../types';
-import { ItemCard } from './ItemCard';
+import { ItineraryCard } from './ItineraryCard';
 import { preloadImages } from '../hooks/useUnsplashImage';
 
 interface TimelineViewProps {
@@ -118,7 +118,7 @@ export default function TimelineView({
                             {/* 时间轴 + 卡片列表 */}
                             <div className="relative space-y-8 pl-2">
                                 {day.items.map((item, itemIndex) => (
-                                    <ItemCard
+                                    <ItineraryCard
                                         key={itemIndex}
                                         item={item}
                                         city={city}
