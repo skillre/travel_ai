@@ -135,7 +135,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     );
 
     return (
-        <div className="h-screen w-screen flex bg-slate-100 overflow-hidden">
+        <div className="h-full w-full flex bg-slate-100 overflow-hidden">
             {/* 左侧面板 */}
             <div
                 className={`
@@ -149,7 +149,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                 {/* Header */}
                 <div className="shrink-0 relative overflow-hidden">
                     {/* 背景图 */}
-                    <div className="relative h-32 md:h-36 w-full">
+                    <div className="relative h-40 md:h-48 w-full">
                         {backgroundImage ? (
                             <Image
                                 src={backgroundImage}
@@ -162,14 +162,14 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         ) : (
                             <div className={`absolute inset-0 bg-gradient-to-br from-teal-400 to-sky-500 ${bgLoading ? 'animate-pulse' : ''}`} />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
                         {/* 标题 */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                            <h1 className="text-lg md:text-xl font-bold text-white leading-tight drop-shadow-lg line-clamp-2">
+                        <div className="absolute bottom-0 left-0 right-0 p-6 z-10">
+                            <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight drop-shadow-lg line-clamp-2 mb-2">
                                 {tripPlan.meta.trip_title}
                             </h1>
-                            <p className="mt-1 text-xs text-white/80 italic drop-shadow line-clamp-1">
+                            <p className="text-sm text-white/90 italic font-medium drop-shadow-md border-l-2 border-teal-400 pl-3 line-clamp-2">
                                 "{tripPlan.meta.trip_vibe}"
                             </p>
                         </div>

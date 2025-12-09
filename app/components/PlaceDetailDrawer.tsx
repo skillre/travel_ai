@@ -56,13 +56,13 @@ export default function PlaceDetailDrawer({
         >
             <div className="h-full w-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-100">
                 {/* 顶部图片区域 */}
-                <div className="relative h-48 bg-slate-100 shrink-0">
+                <div className="relative h-56 bg-slate-100 shrink-0 group">
                     {imageUrl ? (
                         <Image
                             src={imageUrl}
                             alt={item?.title || ''}
                             fill
-                            className="object-cover"
+                            className="object-cover transition-transform duration-700 group-hover:scale-105"
                             priority
                         />
                     ) : (
@@ -71,51 +71,55 @@ export default function PlaceDetailDrawer({
                         </div>
                     )}
 
+                    {/* 渐变遮罩 */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
+
                     {/* 关闭按钮 */}
                     <button
                         onClick={onClose}
-                        className="absolute top-3 right-3 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white transition-colors"
+                        className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 backdrop-blur-md rounded-full text-white/90 hover:text-white transition-all z-20"
                     >
                         <X className="w-5 h-5" />
                     </button>
 
-                    {/* 类型标签 */}
+                    {/* 顶部标签 - 移动到左上角 */}
                     <div className={`
-                        absolute bottom-3 left-3 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md
+                        absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md z-20 border border-white/10
                         ${isFood
-                            ? 'bg-orange-500/90 text-white shadow-sm'
-                            : 'bg-teal-500/90 text-white shadow-sm'
+                            ? 'bg-orange-500/90 text-white shadow-lg'
+                            : 'bg-teal-500/90 text-white shadow-lg'
                         }
                     `}>
                         {isFood ? '美食推荐' : '景点详情'}
                     </div>
+
+                    {/* 标题内容 (覆盖在图片上) */}
+                    <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
+                        <h2 className="text-2xl font-bold text-white leading-tight drop-shadow-md mb-2">
+                            {item?.title}
+                        </h2>
+                        <div className="flex items-center flex-wrap gap-2 text-sm">
+                            <span className="bg-white/20 backdrop-blur-sm px-2.5 py-0.5 rounded text-white border border-white/20 font-medium">
+                                {item?.time_label}
+                            </span>
+                            {item?.cost ? (
+                                <span className="text-emerald-300 font-bold drop-shadow-sm text-base">
+                                    ¥{item.cost}<span className="text-xs font-normal text-white/80 ml-0.5">/人</span>
+                                </span>
+                            ) : (
+                                <span className="text-white/90 backdrop-blur-sm px-2 py-0.5 rounded border border-white/10 bg-white/10">免费</span>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* 内容滚动区域 */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-white">
                     <div className="p-5 space-y-6">
-                        {/* 标题部分 */}
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-800 leading-tight">
-                                {item?.title}
-                            </h2>
-                            <div className="flex items-center gap-2 mt-2 text-sm text-slate-500">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 font-medium">
-                                    {item?.time_label}
-                                </span>
-                                {item?.cost ? (
-                                    <span className="text-emerald-600 font-medium price-tag">
-                                        ¥{item.cost}/人
-                                    </span>
-                                ) : (
-                                    <span className="text-slate-400">免费</span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 标签 */}
+                        {/* 标签 - 稍微调整上边距 */}
                         {item?.tags && item.tags.length > 0 && (
                             <div className="flex flex-wrap gap-2">
+
                                 {item.tags.map((tag, i) => (
                                     <span
                                         key={i}
