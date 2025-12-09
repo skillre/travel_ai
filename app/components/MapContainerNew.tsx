@@ -441,14 +441,25 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const setActiveMarkerImpl = useCallback((dayIndex: number, itemIndex: number) => {
             const map = mapInstance.current;
             const AMap = AMapRef.current;
-            if (!map || !AMap || !markersRef.current[dayIndex]?.[itemIndex]) return;
+
+            console.log('[Map] setActiveMarker called:', { dayIndex, itemIndex, mapReady: !!map, markersReady: !!markersRef.current[dayIndex]?.[itemIndex] });
+
+            if (!map || !AMap) {
+                console.warn('[Map] Map not ready');
+                return;
+            }
+
+            if (!markersRef.current[dayIndex]?.[itemIndex]) {
+                console.warn('[Map] Marker not found:', { dayIndex, itemIndex, markers: markersRef.current });
+                return;
+            }
 
             // 恢复上一个激活 marker 的 zIndex
             if (lastActiveMarkerRef.current) {
                 const { dayIndex: prevDay, itemIndex: prevItem } = lastActiveMarkerRef.current;
                 const prevMarker = markersRef.current[prevDay]?.[prevItem];
                 if (prevMarker) {
-                    const prevOriginalZIndex = prevMarker.getExtData().originalZIndex;
+                    const prevOriginalZIndex = prevMarker.getExtData()?.originalZIndex || 100;
                     prevMarker.setZIndex(prevOriginalZIndex);
                 }
             }
@@ -458,24 +469,26 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
             // 1. 平滑缩放和平移到标记位置
             const position = marker.getPosition();
+            console.log('[Map] Moving to position:', position);
             map.setZoomAndCenter(16, position, false, 500);
 
             // 2. 置顶：设置最高 zIndex
             marker.setZIndex(9999);
 
-            // 3. 精确2次跳动动画 - 使用 AMap 内置动画
+            // 3. 跳动动画 - 使用 AMap 内置动画
             // 先停止可能存在的动画
             marker.setAnimation('AMAP_ANIMATION_NONE');
 
-            // 开始跳动动画
+            // 地图移动后开始跳动动画
             setTimeout(() => {
+                console.log('[Map] Starting bounce animation');
                 marker.setAnimation('AMAP_ANIMATION_BOUNCE');
 
-                // 1.5秒后停止（大约2次跳动）
+                // 1.5秒后停止
                 setTimeout(() => {
                     marker.setAnimation('AMAP_ANIMATION_NONE');
                 }, 1500);
-            }, 600); // 等待地图移动完成后再跳动
+            }, 550);
 
         }, []);
 
