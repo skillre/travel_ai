@@ -245,59 +245,51 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                     const isFood = item.type === 'food';
                     const markerColor = isFood ? '#f97316' : '#0d9488'; // 橙色/深青色
-                    const zIndex = 100 + (timeline.length - dayIndex) * 100 + itemIndex; // 保证后面的天数或者同一个天的后面项目在上面
+                    const zIndex = 100 + (timeline.length - dayIndex) * 100 + itemIndex;
 
-                    // Marker 内容 - 水滴形 Pin 设计
-                    // 使用 CSS 绘制水滴形状：宽上圆下尖
+                    // Marker 内容 - 简洁的水滴形 Pin 设计
                     const pinContent = `
-                        <div style="position: relative; width: 32px; height: 42px;">
+                        <div class="map-marker-pin" style="
+                            width: 32px;
+                            height: 40px;
+                            position: relative;
+                            cursor: pointer;
+                        ">
                             <div style="
                                 position: absolute;
                                 top: 0;
                                 left: 50%;
-                                transform: translateX(-50%);
-                                width: 30px;
-                                height: 30px;
+                                width: 28px;
+                                height: 28px;
+                                margin-left: -14px;
                                 background: ${markerColor};
                                 border-radius: 50% 50% 50% 0;
-                                transform: translateX(-50%) rotate(-45deg);
-                                box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                                border: 2px solid white;
+                                transform: rotate(-45deg);
+                                box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+                                border: 2.5px solid white;
                             ">
                                 <div style="
-                                    transform: rotate(45deg);
+                                    position: absolute;
+                                    top: 50%;
+                                    left: 50%;
+                                    transform: translate(-50%, -50%) rotate(45deg);
                                     color: white;
                                     font-weight: bold;
-                                    font-size: 13px;
+                                    font-size: 12px;
                                     font-family: Arial, sans-serif;
+                                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
                                 ">${itemIndex + 1}</div>
                             </div>
-                            <!-- 阴影底座 -->
-                            <div style="
-                                position: absolute;
-                                bottom: 0;
-                                left: 50%;
-                                transform: translateX(-50%);
-                                width: 14px;
-                                height: 6px;
-                                background: rgba(0,0,0,0.3);
-                                border-radius: 50%;
-                                filter: blur(2px);
-                            "></div>
                         </div>
                     `;
 
                     const marker = new AMap.Marker({
                         position: lnglat,
                         content: pinContent,
-                        offset: new AMap.Pixel(0, 0), // anchor 为 bottom-center 时，offset 设为 0
+                        offset: new AMap.Pixel(-16, -40), // 调整偏移让尖端对准坐标
                         zIndex: zIndex,
-                        anchor: 'bottom-center',
                         cursor: 'pointer',
-                        extData: { originalZIndex: zIndex } // Store original zIndex
+                        extData: { originalZIndex: zIndex, dayIndex, itemIndex }
                     });
 
                     // Hover 气泡
@@ -394,21 +386,21 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             ? `${Math.round(distance)}m`
                             : `${(distance / 1000).toFixed(1)}km`;
 
-                        // 1. Draw Line - 更拟物化的样式
+                        // 1. Draw Line - 线条在标记下层，视觉上穿过标记
                         const polyline = new AMap.Polyline({
                             path: [prevLngLat, lnglat],
-                            strokeColor: isWalking ? dayColor : dayColor,
-                            strokeWeight: isWalking ? 4 : 7,
-                            strokeOpacity: isWalking ? 0.75 : 0.9,
+                            strokeColor: dayColor,
+                            strokeWeight: isWalking ? 4 : 6,
+                            strokeOpacity: isWalking ? 0.7 : 0.85,
                             isOutline: true,
                             outlineColor: 'white',
                             borderWeight: isWalking ? 1 : 2,
                             strokeStyle: isWalking ? 'dashed' : 'solid',
-                            strokeDasharray: isWalking ? [6, 6] : undefined, // 更密的虚点模拟脚印
+                            strokeDasharray: isWalking ? [8, 6] : undefined,
                             lineJoin: 'round',
                             lineCap: 'round',
                             showDir: !isWalking, // 驾车显示方向箭头
-                            zIndex: 50,
+                            zIndex: 10, // 低于标记(100+)，让标记覆盖在线上
                         });
                         map.add(polyline);
                         polylinesRef.current.push(polyline);
@@ -459,9 +451,8 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         const midMarker = new AMap.Marker({
                             position: new AMap.LngLat(midLng, midLat),
                             content: transportIconContent,
-                            offset: new AMap.Pixel(0, 0),
-                            anchor: 'center',
-                            zIndex: 51,
+                            offset: new AMap.Pixel(-20, -30), // 居中对齐
+                            zIndex: 20, // 在路线(10)上方但在标记(100+)下方
                         });
                         map.add(midMarker);
                         polylinesRef.current.push(midMarker);
@@ -507,52 +498,25 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             lastActiveMarkerRef.current = { dayIndex, itemIndex };
 
             // 1. 平滑缩放和平移到标记位置
-            map.setZoomAndCenter(16, marker.getPosition(), false, 500);
+            const position = marker.getPosition();
+            map.setZoomAndCenter(16, position, false, 500);
 
             // 2. 置顶：设置最高 zIndex
             marker.setZIndex(9999);
 
-            // 3. 精确2次跳动动画
-            // 使用自定义 CSS 动画实现精确2次跳动
-            const markerDom = marker.getContentElement ? marker.getContentElement() : marker.dom;
-            if (markerDom) {
-                // 添加自定义跳动动画样式
-                const style = document.createElement('style');
-                style.id = 'bounce-animation-style';
-                if (!document.getElementById('bounce-animation-style')) {
-                    style.textContent = `
-                        @keyframes customBounce {
-                            0%, 100% { transform: translateY(0); }
-                            15% { transform: translateY(-20px); }
-                            30% { transform: translateY(0); }
-                            45% { transform: translateY(-12px); }
-                            60% { transform: translateY(0); }
-                        }
-                        .marker-bounce-twice {
-                            animation: customBounce 1.5s ease-out forwards;
-                        }
-                    `;
-                    document.head.appendChild(style);
-                }
+            // 3. 精确2次跳动动画 - 使用 AMap 内置动画
+            // 先停止可能存在的动画
+            marker.setAnimation('AMAP_ANIMATION_NONE');
 
-                // 移除之前的动画类（如果有）
-                markerDom.classList.remove('marker-bounce-twice');
-                // 触发 reflow 以重新应用动画
-                void markerDom.offsetWidth;
-                // 添加动画类
-                markerDom.classList.add('marker-bounce-twice');
-
-                // 动画结束后移除类
-                setTimeout(() => {
-                    markerDom.classList.remove('marker-bounce-twice');
-                }, 1500);
-            } else {
-                // 如果无法获取 DOM，使用 AMap 内置动画作为后备
+            // 开始跳动动画
+            setTimeout(() => {
                 marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+
+                // 1.5秒后停止（大约2次跳动）
                 setTimeout(() => {
                     marker.setAnimation('AMAP_ANIMATION_NONE');
                 }, 1500);
-            }
+            }, 600); // 等待地图移动完成后再跳动
 
         }, []);
 
