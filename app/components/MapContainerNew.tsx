@@ -405,54 +405,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         map.add(polyline);
                         polylinesRef.current.push(polyline);
 
-                        // 2. Draw Transport Icon at Midpoint - 更生动拟物的设计
-                        const transportIconContent = `
-                            <div style="
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                gap: 2px;
-                                cursor: pointer;
-                                transition: transform 0.2s ease;
-                            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                                <div style="
-                                    background: ${isWalking ? '#f8fafc' : 'white'};
-                                    padding: ${isWalking ? '6px' : '8px'};
-                                    border-radius: ${isWalking ? '12px' : '16px'};
-                                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                                    border: 2px solid ${dayColor};
-                                    font-size: ${isWalking ? '18px' : '20px'};
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    position: relative;
-                                ">
-                                    ${isWalking ? '🚶‍♂️' : '🚗'}
-                                </div>
-                                <div style="
-                                    background: ${dayColor};
-                                    color: white;
-                                    padding: 3px 8px;
-                                    border-radius: 10px;
-                                    font-size: 10px;
-                                    font-weight: 600;
-                                    font-family: system-ui, -apple-system, sans-serif;
-                                    white-space: nowrap;
-                                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-                                    display: flex;
-                                    align-items: center;
-                                    gap: 3px;
-                                ">
-                                    <span>${isWalking ? '🚶' : '🚙'}</span>
-                                    <span>约${estimatedTime}</span>
-                                </div>
-                            </div>
-                        `;
+                        // 2. Draw Transport Icon at Midpoint - 简洁的设计
+                        const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;"><div style="background:white;padding:4px 6px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime}</div></div>`;
                         const midMarker = new AMap.Marker({
                             position: new AMap.LngLat(midLng, midLat),
                             content: transportIconContent,
-                            offset: new AMap.Pixel(-20, -30), // 居中对齐
-                            zIndex: 20, // 在路线(10)上方但在标记(100+)下方
+                            offset: new AMap.Pixel(-20, -25),
+                            zIndex: 20,
                         });
                         map.add(midMarker);
                         polylinesRef.current.push(midMarker);
