@@ -451,7 +451,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             }
 
             if (!markersRef.current[dayIndex]?.[itemIndex]) {
-                console.warn('[Map] Marker not found:', { dayIndex, itemIndex, markers: markersRef.current });
+                console.warn('[Map] Marker not found:', { dayIndex, itemIndex });
                 return;
             }
 
@@ -459,8 +459,8 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             if (lastActiveMarkerRef.current) {
                 const { dayIndex: prevDay, itemIndex: prevItem } = lastActiveMarkerRef.current;
                 const prevMarker = markersRef.current[prevDay]?.[prevItem];
-                if (prevMarker) {
-                    const prevOriginalZIndex = prevMarker.getExtData()?.originalZIndex || 100;
+                if (prevMarker && typeof prevMarker.setZIndex === 'function') {
+                    const prevOriginalZIndex = prevMarker.getExtData?.()?.originalZIndex || 100;
                     prevMarker.setZIndex(prevOriginalZIndex);
                 }
             }
@@ -468,28 +468,38 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const marker = markersRef.current[dayIndex][itemIndex];
             lastActiveMarkerRef.current = { dayIndex, itemIndex };
 
+            // 检查 marker 是否有必要的方法
+            if (typeof marker.getPosition !== 'function') {
+                console.warn('[Map] Invalid marker object');
+                return;
+            }
+
             // 1. 平滑缩放和平移到标记位置
             const position = marker.getPosition();
             console.log('[Map] Moving to position:', position);
             map.setZoomAndCenter(16, position, false, 500);
 
             // 2. 置顶：设置最高 zIndex
-            marker.setZIndex(9999);
+            if (typeof marker.setZIndex === 'function') {
+                marker.setZIndex(9999);
+            }
 
             // 3. 跳动动画 - 使用 AMap 内置动画
-            // 先停止可能存在的动画
-            marker.setAnimation('AMAP_ANIMATION_NONE');
+            if (typeof marker.setAnimation === 'function') {
+                // 先停止可能存在的动画
+                marker.setAnimation('AMAP_ANIMATION_NONE');
 
-            // 地图移动后开始跳动动画
-            setTimeout(() => {
-                console.log('[Map] Starting bounce animation');
-                marker.setAnimation('AMAP_ANIMATION_BOUNCE');
-
-                // 1.5秒后停止
+                // 地图移动后开始跳动动画
                 setTimeout(() => {
-                    marker.setAnimation('AMAP_ANIMATION_NONE');
-                }, 1500);
-            }, 550);
+                    console.log('[Map] Starting bounce animation');
+                    marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+
+                    // 1.5秒后停止
+                    setTimeout(() => {
+                        marker.setAnimation('AMAP_ANIMATION_NONE');
+                    }, 1500);
+                }, 550);
+            }
 
         }, []);
 
