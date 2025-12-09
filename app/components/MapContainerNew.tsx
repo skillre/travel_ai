@@ -319,7 +319,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     const marker = new AMap.Marker({
                         position: lnglat,
                         content: pinContent,
-                        offset: new AMap.Pixel(-16, -38), // 调整偏移量以对准底部
+                        offset: new AMap.Pixel(0, 0), // anchor 为 bottom-center 时，offset 设为 0
                         zIndex: zIndex,
                         anchor: 'bottom-center',
                         cursor: 'pointer',

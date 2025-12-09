@@ -36,9 +36,14 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-tender-blue-400 to-fresh-green-400 flex items-center justify-center shadow-lg shadow-tender-blue-500/20 group-hover:shadow-tender-blue-500/30 transition-all duration-300 group-hover:scale-105 text-white">
                             <span className="text-xl">✈️</span>
                         </div>
-                        <h1 className="text-lg font-bold bg-gradient-to-r from-tender-blue-600 to-fresh-green-500 bg-clip-text text-transparent hidden md:block tracking-tight">
-                            AI 旅行规划师
-                        </h1>
+                        <div className="flex flex-col">
+                            <h1 className="text-lg font-bold bg-gradient-to-r from-tender-blue-600 to-fresh-green-500 bg-clip-text text-transparent hidden md:block tracking-tight leading-tight">
+                                AI 旅行规划师
+                            </h1>
+                            <span className="text-[10px] text-slate-400 font-medium tracking-wider group-hover:text-tender-blue-500 transition-colors uppercase">
+                                返回首页
+                            </span>
+                        </div>
                     </div>
 
                     {/* Search Bar - Light/Clean */}

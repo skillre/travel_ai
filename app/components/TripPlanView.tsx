@@ -263,7 +263,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     transition-all duration-300 ease-in-out
                     border border-l-0 border-slate-200
                     ${isSidebarOpen
-                        ? 'left-[400px] lg:left-[440px]'
+                        ? 'left-[400px] md:left-[480px] lg:left-[520px]'
                         : 'left-0'}
                 `}
                 aria-label={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
