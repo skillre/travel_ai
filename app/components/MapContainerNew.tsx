@@ -205,6 +205,19 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             return R * c; // in metres
         };
 
+        // 计算预估时间
+        const getEstimatedTime = (distanceInMeters: number, isWalking: boolean) => {
+            if (isWalking) {
+                // 步行约 5km/h = 83m/min
+                const minutes = Math.round(distanceInMeters / 83);
+                return minutes < 1 ? '1分钟' : `${minutes}分钟`;
+            } else {
+                // 驾车约 30km/h (城市路况) = 500m/min
+                const minutes = Math.round(distanceInMeters / 500);
+                return minutes < 1 ? '1分钟' : `${minutes}分钟`;
+            }
+        };
+
         // 绘制标记和路线 - 只在初始化时调用一次
         const drawMarkersAndRoutes = useCallback(() => {
             const map = mapInstance.current;
@@ -375,41 +388,72 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         const midLat = (prevItem.location.lat + item.location.lat) / 2;
                         const midLng = (prevItem.location.lng + item.location.lng) / 2;
 
-                        // 1. Draw Line
+                        // 计算预估时间
+                        const estimatedTime = getEstimatedTime(distance, isWalking);
+                        const distanceText = distance < 1000
+                            ? `${Math.round(distance)}m`
+                            : `${(distance / 1000).toFixed(1)}km`;
+
+                        // 1. Draw Line - 更拟物化的样式
                         const polyline = new AMap.Polyline({
                             path: [prevLngLat, lnglat],
-                            strokeColor: dayColor,
-                            strokeWeight: isWalking ? 5 : 6,
-                            strokeOpacity: 0.9,
+                            strokeColor: isWalking ? dayColor : dayColor,
+                            strokeWeight: isWalking ? 4 : 7,
+                            strokeOpacity: isWalking ? 0.75 : 0.9,
                             isOutline: true,
                             outlineColor: 'white',
-                            borderWeight: 2,
+                            borderWeight: isWalking ? 1 : 2,
                             strokeStyle: isWalking ? 'dashed' : 'solid',
-                            strokeDasharray: isWalking ? [10, 8] : undefined, // Dashed pattern for walking
+                            strokeDasharray: isWalking ? [6, 6] : undefined, // 更密的虚点模拟脚印
                             lineJoin: 'round',
                             lineCap: 'round',
-                            showDir: true,
+                            showDir: !isWalking, // 驾车显示方向箭头
                             zIndex: 50,
                         });
                         map.add(polyline);
                         polylinesRef.current.push(polyline);
 
-                        // 2. Draw Transport Icon at Midpoint
+                        // 2. Draw Transport Icon at Midpoint - 更生动拟物的设计
                         const transportIconContent = `
                             <div style="
-                                background: white;
-                                padding: 4px;
-                                border-radius: 50%;
-                                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-                                border: 1px solid ${dayColor};
-                                font-size: 14px;
-                                width: 24px;
-                                height: 24px;
                                 display: flex;
+                                flex-direction: column;
                                 align-items: center;
-                                justify-content: center;
-                            ">
-                                ${isWalking ? '🚶' : '🚗'}
+                                gap: 2px;
+                                cursor: pointer;
+                                transition: transform 0.2s ease;
+                            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                <div style="
+                                    background: ${isWalking ? '#f8fafc' : 'white'};
+                                    padding: ${isWalking ? '6px' : '8px'};
+                                    border-radius: ${isWalking ? '12px' : '16px'};
+                                    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                                    border: 2px solid ${dayColor};
+                                    font-size: ${isWalking ? '18px' : '20px'};
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    position: relative;
+                                ">
+                                    ${isWalking ? '🚶‍♂️' : '🚗'}
+                                </div>
+                                <div style="
+                                    background: ${dayColor};
+                                    color: white;
+                                    padding: 3px 8px;
+                                    border-radius: 10px;
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    font-family: system-ui, -apple-system, sans-serif;
+                                    white-space: nowrap;
+                                    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 3px;
+                                ">
+                                    <span>${isWalking ? '🚶' : '🚙'}</span>
+                                    <span>约${estimatedTime}</span>
+                                </div>
                             </div>
                         `;
                         const midMarker = new AMap.Marker({
@@ -420,9 +464,6 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             zIndex: 51,
                         });
                         map.add(midMarker);
-                        // We push midMarker to "polylinesRef" or a new "decorationsRef" if we want to toggle them.
-                        // For simplicity, we can let them stick around or add to polylinesRef to hide/show with day toggles if needed.
-                        // Here I'll add to polylinesRef just so they get hidden when day is hidden.
                         polylinesRef.current.push(midMarker);
                     }
 
@@ -443,41 +484,75 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             }
         }, [timeline, onMarkerClick, selectedDay, updateVisibility, showItemDetailOnMap]);
 
-        // Updated Helper: Set Active Marker
+        // 跟踪上一个激活的 marker
+        const lastActiveMarkerRef = useRef<{ dayIndex: number, itemIndex: number } | null>(null);
+
+        // Updated Helper: Set Active Marker - 精确2次跳动
         const setActiveMarkerImpl = useCallback((dayIndex: number, itemIndex: number) => {
             const map = mapInstance.current;
-            if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
+            const AMap = AMapRef.current;
+            if (!map || !AMap || !markersRef.current[dayIndex]?.[itemIndex]) return;
+
+            // 恢复上一个激活 marker 的 zIndex
+            if (lastActiveMarkerRef.current) {
+                const { dayIndex: prevDay, itemIndex: prevItem } = lastActiveMarkerRef.current;
+                const prevMarker = markersRef.current[prevDay]?.[prevItem];
+                if (prevMarker) {
+                    const prevOriginalZIndex = prevMarker.getExtData().originalZIndex;
+                    prevMarker.setZIndex(prevOriginalZIndex);
+                }
+            }
 
             const marker = markersRef.current[dayIndex][itemIndex];
-            const originalZIndex = marker.getExtData().originalZIndex;
+            lastActiveMarkerRef.current = { dayIndex, itemIndex };
 
-            // 1. Zoom and Pan
-            // Smooth zoom to 16
+            // 1. 平滑缩放和平移到标记位置
             map.setZoomAndCenter(16, marker.getPosition(), false, 500);
 
-            // 2. Bring to Front
+            // 2. 置顶：设置最高 zIndex
             marker.setZIndex(9999);
 
-            // 3. Bounce Animation (Two jumps)
-            // AMap's BOUNCE usually loops. We can use setAnimation multiple times or use setTimeout
-            marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+            // 3. 精确2次跳动动画
+            // 使用自定义 CSS 动画实现精确2次跳动
+            const markerDom = marker.getContentElement ? marker.getContentElement() : marker.dom;
+            if (markerDom) {
+                // 添加自定义跳动动画样式
+                const style = document.createElement('style');
+                style.id = 'bounce-animation-style';
+                if (!document.getElementById('bounce-animation-style')) {
+                    style.textContent = `
+                        @keyframes customBounce {
+                            0%, 100% { transform: translateY(0); }
+                            15% { transform: translateY(-20px); }
+                            30% { transform: translateY(0); }
+                            45% { transform: translateY(-12px); }
+                            60% { transform: translateY(0); }
+                        }
+                        .marker-bounce-twice {
+                            animation: customBounce 1.5s ease-out forwards;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
 
-            // Stop after ~1400ms (approx 2 bounces usually)
-            setTimeout(() => {
-                marker.setAnimation('AMAP_ANIMATION_NONE');
-                // Reset Z-Index after a while if we want, or keep it high until next click. 
-                // Let's keep it high or restore? User wants "see it at top". 
-                // Maybe better to restore others? 
-                // For now, let's keep it high so it stays prominent.
-                // Or restore it? If we don't restore, eventually all clicked ones are 9999.
-                // Let's restore after animation to keep the layering logic clean? 
-                // The user says "jump 2 times" and "top layer".
-                // I'll keep it high for a bit longer then restore, OR just leave it high. The user might want it to STAY top while viewing.
-                // Actually, let's Restore when another one becomes active?
-                // Simpler: Just leave it, or set previously active one back.
-                // I'll just leave it high for this session of viewing. 
-                // Wait, if I click another, that one goes on top. That works.
-            }, 2000);
+                // 移除之前的动画类（如果有）
+                markerDom.classList.remove('marker-bounce-twice');
+                // 触发 reflow 以重新应用动画
+                void markerDom.offsetWidth;
+                // 添加动画类
+                markerDom.classList.add('marker-bounce-twice');
+
+                // 动画结束后移除类
+                setTimeout(() => {
+                    markerDom.classList.remove('marker-bounce-twice');
+                }, 1500);
+            } else {
+                // 如果无法获取 DOM，使用 AMap 内置动画作为后备
+                marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                setTimeout(() => {
+                    marker.setAnimation('AMAP_ANIMATION_NONE');
+                }, 1500);
+            }
 
         }, []);
 
