@@ -18,6 +18,7 @@ interface MapContainerNewProps {
     timeline: TripPlanDay[];
     selectedDay?: number | null;
     onMarkerClick?: (dayIndex: number, itemIndex: number) => void;
+    onReady?: (methods: MapContainerNewRef) => void; // 组件就绪时回调
 }
 
 // 每天路线的颜色 - 鲜明的调色板
@@ -27,7 +28,7 @@ const dayColors = [
 ];
 
 const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
-    ({ timeline, selectedDay = null, onMarkerClick }, ref) => {
+    ({ timeline, selectedDay = null, onMarkerClick, onReady }, ref) => {
         const mapContainerRef = useRef<HTMLDivElement>(null);
         const mapInstance = useRef<any>(null);
         const AMapRef = useRef<any>(null);
@@ -493,7 +494,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         }, []);
 
         // 暴露方法
-        useImperativeHandle(ref, () => ({
+        const methods: MapContainerNewRef = {
             panToSpot: (dayIndex: number, itemIndex: number) => {
                 const map = mapInstance.current;
                 if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
@@ -539,8 +540,17 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             showItemDetail: (dayIndex: number, itemIndex: number) => {
                 showItemDetailOnMap(dayIndex, itemIndex);
             },
-        }));
+        };
 
+        useImperativeHandle(ref, () => methods);
+
+        // 当地图就绪时调用 onReady 回调
+        useEffect(() => {
+            if (mapReady && onReady) {
+                console.log('[MapContainerNew] Calling onReady callback');
+                onReady(methods);
+            }
+        }, [mapReady, onReady]);
 
 
         // 初始化地图

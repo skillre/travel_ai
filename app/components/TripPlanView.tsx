@@ -21,6 +21,7 @@ const MapContainerNew = dynamic(() => import('./MapContainerNew'), {
     ),
 });
 
+// MapContainerNew 暴露的方法接口
 interface MapContainerNewRef {
     panToSpot: (dayIndex: number, itemIndex: number) => void;
     highlightSpot: (dayIndex: number, itemIndex: number) => void;
@@ -44,6 +45,7 @@ const dayColors = [
 
 export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const mapRef = useRef<MapContainerNewRef>(null);
+    const [mapMethods, setMapMethods] = useState<MapContainerNewRef | null>(null); // 使用 state 存储地图方法
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [selectedDay, setSelectedDay] = useState<number | null>(null); // null = 全部天
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
@@ -52,6 +54,12 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     // 详情抽屉状态
     const [selectedDetailItem, setSelectedDetailItem] = useState<TripPlanItem | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+    // 地图组件就绪回调
+    const handleMapReady = useCallback((methods: MapContainerNewRef) => {
+        console.log('[TripPlanView] Map is ready, storing methods');
+        setMapMethods(methods);
+    }, []);
 
     // 获取城市背景图
     const fetchCityImage = useCallback(async () => {
@@ -76,26 +84,25 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
 
     // 处理卡片悬停
     const handleItemHover = useCallback((dayIndex: number, itemIndex: number) => {
-        mapRef.current?.highlightSpot(dayIndex, itemIndex);
-    }, []);
+        mapMethods?.highlightSpot(dayIndex, itemIndex);
+    }, [mapMethods]);
 
     // 处理卡片点击 -在其右侧展示详情抽屉
     const handleItemClick = useCallback((dayIndex: number, itemIndex: number, item: TripPlanItem) => {
         console.log('[TripPlanView] handleItemClick called:', { dayIndex, itemIndex, item: item.title });
-        console.log('[TripPlanView] mapRef.current:', mapRef.current);
 
         // 设置选中的项目并打开抽屉
         setSelectedDetailItem(item);
         setIsDetailOpen(true);
 
         // 在地图上高亮并移动到该点
-        if (mapRef.current) {
-            console.log('[TripPlanView] Calling setActiveMarker');
-            mapRef.current.setActiveMarker(dayIndex, itemIndex);
+        if (mapMethods) {
+            console.log('[TripPlanView] Calling setActiveMarker via mapMethods');
+            mapMethods.setActiveMarker(dayIndex, itemIndex);
         } else {
-            console.warn('[TripPlanView] mapRef.current is null!');
+            console.warn('[TripPlanView] mapMethods is null!');
         }
-    }, []);
+    }, [mapMethods]);
 
     // 处理地图 Marker 点击
     const handleMarkerClick = useCallback((dayIndex: number, itemIndex: number) => {
@@ -103,9 +110,9 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
         if (item) {
             setSelectedDetailItem(item);
             setIsDetailOpen(true);
-            mapRef.current?.setActiveMarker(dayIndex, itemIndex);
+            mapMethods?.setActiveMarker(dayIndex, itemIndex);
         }
-    }, [tripPlan.timeline]);
+    }, [tripPlan.timeline, mapMethods]);
 
     // 关闭详情抽屉
     const closeDetailDrawer = useCallback(() => {
@@ -118,19 +125,19 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const toggleSidebar = useCallback(() => {
         setIsSidebarOpen(prev => !prev);
         setTimeout(() => {
-            mapRef.current?.resize();
+            mapMethods?.resize();
         }, 350);
-    }, []);
+    }, [mapMethods]);
 
     // 选择天数
     const handleSelectDay = useCallback((dayIndex: number | null) => {
         setSelectedDay(dayIndex);
         if (dayIndex !== null) {
-            mapRef.current?.showDay(dayIndex);
+            mapMethods?.showDay(dayIndex);
         } else {
-            mapRef.current?.showAllDays();
+            mapMethods?.showAllDays();
         }
-    }, []);
+    }, [mapMethods]);
 
     // 统计数据
     const totalSpots = tripPlan.timeline.reduce(
@@ -290,6 +297,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     timeline={tripPlan.timeline}
                     selectedDay={selectedDay}
                     onMarkerClick={handleMarkerClick}
+                    onReady={handleMapReady}
                 />
 
                 {/* 详情抽屉 (作为地图区域的浮层) */}
