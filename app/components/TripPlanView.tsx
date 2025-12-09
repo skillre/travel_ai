@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Coins, Lightbulb, Map, Calendar, Layers } fr
 import Image from 'next/image';
 import { TripPlan, TripPlanItem } from '../types';
 import TimelineView from './TimelineView';
+import PlaceDetailDrawer from './PlaceDetailDrawer';
 
 // 动态导入地图组件
 const MapContainerNew = dynamic(() => import('./MapContainerNew'), {
@@ -48,6 +49,10 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const [bgLoading, setBgLoading] = useState(true);
 
+    // 详情抽屉状态
+    const [selectedDetailItem, setSelectedDetailItem] = useState<TripPlanItem | null>(null);
+    const [isDetailOpen, setIsDetailOpen] = useState(false);
+
     // 获取城市背景图
     const fetchCityImage = useCallback(async () => {
         try {
@@ -74,14 +79,31 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
         mapRef.current?.highlightSpot(dayIndex, itemIndex);
     }, []);
 
-    // 处理卡片点击 - 在地图上显示详情
+    // 处理卡片点击 -在其右侧展示详情抽屉
     const handleItemClick = useCallback((dayIndex: number, itemIndex: number, item: TripPlanItem) => {
-        mapRef.current?.showItemDetail(dayIndex, itemIndex);
+        // 设置选中的项目并打开抽屉
+        setSelectedDetailItem(item);
+        setIsDetailOpen(true);
+
+        // 在地图上高亮并移动到该点
+        mapRef.current?.setActiveMarker(dayIndex, itemIndex);
     }, []);
 
     // 处理地图 Marker 点击
     const handleMarkerClick = useCallback((dayIndex: number, itemIndex: number) => {
-        console.log('Marker clicked:', dayIndex, itemIndex);
+        const item = tripPlan.timeline[dayIndex]?.items[itemIndex];
+        if (item) {
+            setSelectedDetailItem(item);
+            setIsDetailOpen(true);
+            mapRef.current?.setActiveMarker(dayIndex, itemIndex);
+        }
+    }, [tripPlan.timeline]);
+
+    // 关闭详情抽屉
+    const closeDetailDrawer = useCallback(() => {
+        setIsDetailOpen(false);
+        // 稍微延迟清除选中项，让动画更自然
+        setTimeout(() => setSelectedDetailItem(null), 300);
     }, []);
 
     // 切换侧边栏
@@ -244,12 +266,20 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
             </button>
 
             {/* 地图区域 */}
-            <div className="hidden md:block flex-1 h-full relative z-0 bg-slate-100">
+            <div className="hidden md:block flex-1 h-full relative z-0 bg-slate-100 overflow-hidden">
                 <MapContainerNew
                     ref={mapRef}
                     timeline={tripPlan.timeline}
                     selectedDay={selectedDay}
                     onMarkerClick={handleMarkerClick}
+                />
+
+                {/* 详情抽屉 (作为地图区域的浮层) */}
+                <PlaceDetailDrawer
+                    isOpen={isDetailOpen}
+                    onClose={closeDetailDrawer}
+                    item={selectedDetailItem}
+                    city={tripPlan.meta.city}
                 />
             </div>
 
