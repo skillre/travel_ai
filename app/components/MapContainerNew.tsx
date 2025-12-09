@@ -189,61 +189,21 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             map.panTo(lnglat);
         }, [timeline, createDetailContent]);
 
-        // 暴露方法
-        useImperativeHandle(ref, () => ({
-            panToSpot: (dayIndex: number, itemIndex: number) => {
-                const map = mapInstance.current;
-                if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
-                const marker = markersRef.current[dayIndex][itemIndex];
-                map.panTo(marker.getPosition());
-            },
-            highlightSpot: (dayIndex: number, itemIndex: number) => {
-                const marker = markersRef.current[dayIndex]?.[itemIndex];
-                if (marker) {
-                    marker.setAnimation('AMAP_ANIMATION_BOUNCE');
-                    setTimeout(() => marker.setAnimation('AMAP_ANIMATION_NONE'), 1500);
-                }
-            },
-            clearHighlight: () => { },
-            setActiveMarker: (dayIndex: number, itemIndex: number) => {
-                const map = mapInstance.current;
-                if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
-                const marker = markersRef.current[dayIndex][itemIndex];
-                map.panTo(marker.getPosition());
-                marker.setAnimation('AMAP_ANIMATION_BOUNCE');
-                setTimeout(() => marker.setAnimation('AMAP_ANIMATION_NONE'), 1500);
-            },
-            resize: () => {
-                if (mapInstance.current) {
-                    setTimeout(() => mapInstance.current.resize(), 100);
-                }
-            },
-            showAllDays: () => {
-                updateVisibility(null);
-                // 适应所有可见标记
-                const map = mapInstance.current;
-                if (map) {
-                    const allMarkers = markersRef.current.flat();
-                    if (allMarkers.length > 0) {
-                        map.setFitView(allMarkers, false, [80, 80, 80, 80]);
-                    }
-                }
-            },
-            showDay: (dayIndex: number) => {
-                updateVisibility(dayIndex);
-                // 适应选中天的标记
-                const map = mapInstance.current;
-                if (map && markersRef.current[dayIndex]) {
-                    const dayMarkers = markersRef.current[dayIndex];
-                    if (dayMarkers.length > 0) {
-                        map.setFitView(dayMarkers, false, [80, 80, 80, 80]);
-                    }
-                }
-            },
-            showItemDetail: (dayIndex: number, itemIndex: number) => {
-                showItemDetailOnMap(dayIndex, itemIndex);
-            },
-        }));
+        // Helper to calculate distance
+        const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+            const R = 6371e3; // metres
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c; // in metres
+        };
 
         // 绘制标记和路线 - 只在初始化时调用一次
         const drawMarkersAndRoutes = useCallback(() => {
@@ -262,12 +222,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
             timeline.forEach((day, dayIndex) => {
                 const dayColor = dayColors[dayIndex % dayColors.length];
-                const pathPoints: any[] = [];
                 const dayMarkers: any[] = [];
+                // Store previous item to draw route from
+                let prevItem: TripPlanItem | null = null;
+                let prevLngLat: any = null;
 
                 day.items.forEach((item, itemIndex) => {
                     const lnglat = new AMap.LngLat(item.location.lng, item.location.lat);
-                    pathPoints.push(lnglat);
 
                     const isFood = item.type === 'food';
                     const markerColor = isFood ? '#f97316' : '#0d9488'; // 橙色/深青色
@@ -323,6 +284,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         zIndex: zIndex,
                         anchor: 'bottom-center',
                         cursor: 'pointer',
+                        extData: { originalZIndex: zIndex } // Store original zIndex
                     });
 
                     // Hover 气泡
@@ -399,31 +361,76 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     map.add(marker);
                     allMarkers.push(marker);
                     dayMarkers.push(marker);
+
+                    // ============================================
+                    // Route Logic: Connect prevItem -> currItem
+                    // ============================================
+                    if (prevItem && prevLngLat) {
+                        const distance = calculateDistance(
+                            prevItem.location.lat, prevItem.location.lng,
+                            item.location.lat, item.location.lng
+                        );
+
+                        const isWalking = distance < 2000; // < 2km = Walking
+                        const midLat = (prevItem.location.lat + item.location.lat) / 2;
+                        const midLng = (prevItem.location.lng + item.location.lng) / 2;
+
+                        // 1. Draw Line
+                        const polyline = new AMap.Polyline({
+                            path: [prevLngLat, lnglat],
+                            strokeColor: dayColor,
+                            strokeWeight: isWalking ? 5 : 6,
+                            strokeOpacity: 0.9,
+                            isOutline: true,
+                            outlineColor: 'white',
+                            borderWeight: 2,
+                            strokeStyle: isWalking ? 'dashed' : 'solid',
+                            strokeDasharray: isWalking ? [10, 8] : undefined, // Dashed pattern for walking
+                            lineJoin: 'round',
+                            lineCap: 'round',
+                            showDir: true,
+                            zIndex: 50,
+                        });
+                        map.add(polyline);
+                        polylinesRef.current.push(polyline);
+
+                        // 2. Draw Transport Icon at Midpoint
+                        const transportIconContent = `
+                            <div style="
+                                background: white;
+                                padding: 4px;
+                                border-radius: 50%;
+                                box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+                                border: 1px solid ${dayColor};
+                                font-size: 14px;
+                                width: 24px;
+                                height: 24px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            ">
+                                ${isWalking ? '🚶' : '🚗'}
+                            </div>
+                        `;
+                        const midMarker = new AMap.Marker({
+                            position: new AMap.LngLat(midLng, midLat),
+                            content: transportIconContent,
+                            offset: new AMap.Pixel(0, 0),
+                            anchor: 'center',
+                            zIndex: 51,
+                        });
+                        map.add(midMarker);
+                        // We push midMarker to "polylinesRef" or a new "decorationsRef" if we want to toggle them.
+                        // For simplicity, we can let them stick around or add to polylinesRef to hide/show with day toggles if needed.
+                        // Here I'll add to polylinesRef just so they get hidden when day is hidden.
+                        polylinesRef.current.push(midMarker);
+                    }
+
+                    prevItem = item;
+                    prevLngLat = lnglat;
                 });
 
                 markersRef.current.push(dayMarkers);
-
-                // 路线 - 双色描边风格
-                if (pathPoints.length > 1) {
-                    const polyline = new AMap.Polyline({
-                        path: pathPoints,
-                        strokeColor: dayColor,
-                        strokeWeight: 7, // 稍微细一点
-                        strokeOpacity: 1.0,
-                        isOutline: true, // 开启描边
-                        outlineColor: 'white', // 白色描边
-                        borderWeight: 2, // 描边宽度
-                        strokeStyle: 'solid',
-                        lineJoin: 'round',
-                        lineCap: 'round',
-                        showDir: true,
-                        zIndex: 50,
-                    });
-                    map.add(polyline);
-                    polylinesRef.current.push(polyline);
-                } else {
-                    polylinesRef.current.push(null);
-                }
             });
 
             if (allMarkers.length > 0) {
@@ -435,6 +442,95 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 updateVisibility(selectedDay);
             }
         }, [timeline, onMarkerClick, selectedDay, updateVisibility, showItemDetailOnMap]);
+
+        // Updated Helper: Set Active Marker
+        const setActiveMarkerImpl = useCallback((dayIndex: number, itemIndex: number) => {
+            const map = mapInstance.current;
+            if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
+
+            const marker = markersRef.current[dayIndex][itemIndex];
+            const originalZIndex = marker.getExtData().originalZIndex;
+
+            // 1. Zoom and Pan
+            // Smooth zoom to 16
+            map.setZoomAndCenter(16, marker.getPosition(), false, 500);
+
+            // 2. Bring to Front
+            marker.setZIndex(9999);
+
+            // 3. Bounce Animation (Two jumps)
+            // AMap's BOUNCE usually loops. We can use setAnimation multiple times or use setTimeout
+            marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+
+            // Stop after ~1400ms (approx 2 bounces usually)
+            setTimeout(() => {
+                marker.setAnimation('AMAP_ANIMATION_NONE');
+                // Reset Z-Index after a while if we want, or keep it high until next click. 
+                // Let's keep it high or restore? User wants "see it at top". 
+                // Maybe better to restore others? 
+                // For now, let's keep it high so it stays prominent.
+                // Or restore it? If we don't restore, eventually all clicked ones are 9999.
+                // Let's restore after animation to keep the layering logic clean? 
+                // The user says "jump 2 times" and "top layer".
+                // I'll keep it high for a bit longer then restore, OR just leave it high. The user might want it to STAY top while viewing.
+                // Actually, let's Restore when another one becomes active?
+                // Simpler: Just leave it, or set previously active one back.
+                // I'll just leave it high for this session of viewing. 
+                // Wait, if I click another, that one goes on top. That works.
+            }, 2000);
+
+        }, []);
+
+        // 暴露方法
+        useImperativeHandle(ref, () => ({
+            panToSpot: (dayIndex: number, itemIndex: number) => {
+                const map = mapInstance.current;
+                if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
+                const marker = markersRef.current[dayIndex][itemIndex];
+                map.panTo(marker.getPosition());
+            },
+            highlightSpot: (dayIndex: number, itemIndex: number) => {
+                const marker = markersRef.current[dayIndex]?.[itemIndex];
+                if (marker) {
+                    marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                    setTimeout(() => marker.setAnimation('AMAP_ANIMATION_NONE'), 1500);
+                }
+            },
+            clearHighlight: () => { },
+            setActiveMarker: (dayIndex: number, itemIndex: number) => {
+                setActiveMarkerImpl(dayIndex, itemIndex);
+            },
+            resize: () => {
+                if (mapInstance.current) {
+                    setTimeout(() => mapInstance.current.resize(), 100);
+                }
+            },
+            showAllDays: () => {
+                updateVisibility(null);
+                const map = mapInstance.current;
+                if (map) {
+                    const allMarkers = markersRef.current.flat();
+                    if (allMarkers.length > 0) {
+                        map.setFitView(allMarkers, false, [80, 80, 80, 80]);
+                    }
+                }
+            },
+            showDay: (dayIndex: number) => {
+                updateVisibility(dayIndex);
+                const map = mapInstance.current;
+                if (map && markersRef.current[dayIndex]) {
+                    const dayMarkers = markersRef.current[dayIndex];
+                    if (dayMarkers.length > 0) {
+                        map.setFitView(dayMarkers, false, [80, 80, 80, 80]);
+                    }
+                }
+            },
+            showItemDetail: (dayIndex: number, itemIndex: number) => {
+                showItemDetailOnMap(dayIndex, itemIndex);
+            },
+        }));
+
+
 
         // 初始化地图
         useEffect(() => {
