@@ -28,6 +28,7 @@ interface MapContainerNewRef {
     resize: () => void;
     showAllDays: () => void;
     showDay: (dayIndex: number) => void;
+    showItemDetail: (dayIndex: number, itemIndex: number) => void;
 }
 
 interface TripPlanViewProps {
@@ -73,9 +74,9 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
         mapRef.current?.highlightSpot(dayIndex, itemIndex);
     }, []);
 
-    // 处理卡片点击
+    // 处理卡片点击 - 在地图上显示详情
     const handleItemClick = useCallback((dayIndex: number, itemIndex: number, item: TripPlanItem) => {
-        mapRef.current?.setActiveMarker(dayIndex, itemIndex);
+        mapRef.current?.showItemDetail(dayIndex, itemIndex);
     }, []);
 
     // 处理地图 Marker 点击
@@ -169,8 +170,8 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         <button
                             onClick={() => handleSelectDay(null)}
                             className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedDay === null
-                                    ? 'bg-slate-800 text-white shadow-md'
-                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                ? 'bg-slate-800 text-white shadow-md'
+                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                                 }`}
                         >
                             <Layers className="w-3.5 h-3.5" />
@@ -181,8 +182,8 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                 key={day.day}
                                 onClick={() => handleSelectDay(index)}
                                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedDay === index
-                                        ? 'text-white shadow-md'
-                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                    ? 'text-white shadow-md'
+                                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
                                     }`}
                                 style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
                             >

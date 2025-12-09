@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// 强制动态渲染，解决 Vercel 部署静态渲染问题
+export const dynamic = 'force-dynamic';
+
 interface UnsplashPhoto {
     urls: {
         small: string;
