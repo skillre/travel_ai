@@ -81,12 +81,20 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
 
     // 处理卡片点击 -在其右侧展示详情抽屉
     const handleItemClick = useCallback((dayIndex: number, itemIndex: number, item: TripPlanItem) => {
+        console.log('[TripPlanView] handleItemClick called:', { dayIndex, itemIndex, item: item.title });
+        console.log('[TripPlanView] mapRef.current:', mapRef.current);
+
         // 设置选中的项目并打开抽屉
         setSelectedDetailItem(item);
         setIsDetailOpen(true);
 
         // 在地图上高亮并移动到该点
-        mapRef.current?.setActiveMarker(dayIndex, itemIndex);
+        if (mapRef.current) {
+            console.log('[TripPlanView] Calling setActiveMarker');
+            mapRef.current.setActiveMarker(dayIndex, itemIndex);
+        } else {
+            console.warn('[TripPlanView] mapRef.current is null!');
+        }
     }, []);
 
     // 处理地图 Marker 点击
