@@ -33,7 +33,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const mapInstance = useRef<any>(null);
         const AMapRef = useRef<any>(null);
         const markersRef = useRef<any[][]>([]);
-        const polylinesRef = useRef<any[]>([]);
+        const polylinesRef = useRef<any[][]>([]); // 按天分组存储路线和交通图标
         const hoverInfoWindowRef = useRef<any>(null);
         const detailInfoWindowRef = useRef<any>(null);
         const isInitializedRef = useRef(false);
@@ -144,23 +144,31 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
         // 更新可见性 - 不触发 setFitView
         const updateVisibility = useCallback((dayToShow: number | null) => {
+            // 更新标记可见性
             markersRef.current.forEach((dayMarkers, dayIndex) => {
                 dayMarkers.forEach(marker => {
-                    if (dayToShow === null || dayToShow === dayIndex) {
-                        marker.show();
-                    } else {
-                        marker.hide();
+                    if (marker && typeof marker.show === 'function') {
+                        if (dayToShow === null || dayToShow === dayIndex) {
+                            marker.show();
+                        } else {
+                            marker.hide();
+                        }
                     }
                 });
             });
 
-            polylinesRef.current.forEach((polyline, dayIndex) => {
-                if (polyline) {
-                    if (dayToShow === null || dayToShow === dayIndex) {
-                        polyline.show();
-                    } else {
-                        polyline.hide();
-                    }
+            // 更新路线和交通图标可见性
+            polylinesRef.current.forEach((dayPolylines, dayIndex) => {
+                if (dayPolylines) {
+                    dayPolylines.forEach(item => {
+                        if (item && typeof item.show === 'function') {
+                            if (dayToShow === null || dayToShow === dayIndex) {
+                                item.show();
+                            } else {
+                                item.hide();
+                            }
+                        }
+                    });
                 }
             });
         }, []);
@@ -237,7 +245,9 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             timeline.forEach((day, dayIndex) => {
                 const dayColor = dayColors[dayIndex % dayColors.length];
                 const dayMarkers: any[] = [];
-                // Store previous item to draw route from
+                const dayPolylines: any[] = []; // 这一天的路线和交通图标
+
+                // 追踪上一个 item 以绘制路线
                 let prevItem: TripPlanItem | null = null;
                 let prevLngLat: any = null;
 
@@ -404,7 +414,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             zIndex: 10, // 低于标记(100+)，让标记覆盖在线上
                         });
                         map.add(polyline);
-                        polylinesRef.current.push(polyline);
+                        dayPolylines.push(polyline);
 
                         // 2. Draw Transport Icon at Midpoint - 简洁的设计
                         const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;"><div style="background:white;padding:4px 6px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime}</div></div>`;
@@ -415,7 +425,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             zIndex: 20,
                         });
                         map.add(midMarker);
-                        polylinesRef.current.push(midMarker);
+                        dayPolylines.push(midMarker);
                     }
 
                     prevItem = item;
@@ -423,6 +433,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 });
 
                 markersRef.current.push(dayMarkers);
+                polylinesRef.current.push(dayPolylines); // 按天存储路线
             });
 
             if (allMarkers.length > 0) {
