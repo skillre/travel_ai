@@ -20,6 +20,7 @@ export interface TripPlanItem {
     type: 'spot' | 'food';
     time_label: string; // e.g. "上午", "午餐"
     title: string;
+    address?: string; // 详细地址 (可选，兼容旧数据)
     sub_title: string; // e.g. "建议游玩 2小时" 或 "距上一站步行 300m"
     location: { lat: number; lng: number };
     emoji: string;

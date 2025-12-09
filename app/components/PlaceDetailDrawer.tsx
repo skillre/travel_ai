@@ -174,6 +174,13 @@ export default function PlaceDetailDrawer({
                                     <span>建议游玩: {duration}</span>
                                 </div>
                             )}
+                            {/* 详细地址 */}
+                            {item?.address && (
+                                <div className="flex items-start gap-3 text-sm text-slate-600">
+                                    <MapPin className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
+                                    <span className="leading-relaxed">{item.address}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-3 text-sm text-slate-600">
                                 <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
                                 <span>{item?.sub_title || '查看地图定位'}</span>

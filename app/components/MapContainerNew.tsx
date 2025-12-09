@@ -94,6 +94,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                                 ${item.time_label}
                             </div>
                             ${item.sub_title ? `<div style="font-size: 12px; color: #94a3b8; margin-top: 4px;">${item.sub_title}</div>` : ''}
+                            ${item.address ? `<div style="font-size: 12px; color: #0d9488; margin-top: 6px; display: flex; align-items: flex-start; gap: 4px;"><span style="flex-shrink: 0;">📍</span><span style="line-height: 1.4;">${item.address}</span></div>` : ''}
                         </div>
                     </div>
                     
