@@ -270,34 +270,59 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     pathPoints.push(lnglat);
 
                     const isFood = item.type === 'food';
-                    const markerColor = isFood ? '#f97316' : '#14b8a6';
+                    const markerColor = isFood ? '#f97316' : '#0d9488'; // 橙色/深青色
+                    const zIndex = 100 + (timeline.length - dayIndex) * 100 + itemIndex; // 保证后面的天数或者同一个天的后面项目在上面
 
-                    // Marker 内容 - 带序号的圆点
-                    const dotContent = `
-                        <div style="
-                            width: 26px;
-                            height: 26px;
-                            border-radius: 50%;
-                            background: ${markerColor};
-                            border: 3px solid white;
-                            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-                            cursor: pointer;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 12px;
-                            color: white;
-                            font-weight: bold;
-                        ">
-                            ${itemIndex + 1}
+                    // Marker 内容 - 水滴形 Pin 设计
+                    // 使用 CSS 绘制水滴形状：宽上圆下尖
+                    const pinContent = `
+                        <div style="position: relative; width: 32px; height: 42px;">
+                            <div style="
+                                position: absolute;
+                                top: 0;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                width: 30px;
+                                height: 30px;
+                                background: ${markerColor};
+                                border-radius: 50% 50% 50% 0;
+                                transform: translateX(-50%) rotate(-45deg);
+                                box-shadow: 2px 2px 8px rgba(0,0,0,0.4);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                border: 2px solid white;
+                            ">
+                                <div style="
+                                    transform: rotate(45deg);
+                                    color: white;
+                                    font-weight: bold;
+                                    font-size: 13px;
+                                    font-family: Arial, sans-serif;
+                                ">${itemIndex + 1}</div>
+                            </div>
+                            <!-- 阴影底座 -->
+                            <div style="
+                                position: absolute;
+                                bottom: 0;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                width: 14px;
+                                height: 6px;
+                                background: rgba(0,0,0,0.3);
+                                border-radius: 50%;
+                                filter: blur(2px);
+                            "></div>
                         </div>
                     `;
 
                     const marker = new AMap.Marker({
                         position: lnglat,
-                        content: dotContent,
-                        offset: new AMap.Pixel(-13, -13),
-                        zIndex: 100 + itemIndex,
+                        content: pinContent,
+                        offset: new AMap.Pixel(-16, -38), // 调整偏移量以对准底部
+                        zIndex: zIndex,
+                        anchor: 'bottom-center',
+                        cursor: 'pointer',
                     });
 
                     // Hover 气泡
@@ -310,19 +335,31 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             <div style="
                                 padding: 10px 14px;
                                 background: white;
-                                border-radius: 10px;
-                                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                                border-radius: 12px;
+                                box-shadow: 0 8px 24px rgba(0,0,0,0.2);
                                 font-family: system-ui, sans-serif;
                                 min-width: 140px;
-                                max-width: 220px;
+                                max-width: 240px;
+                                border: 1px solid rgba(0,0,0,0.05);
+                                transform: translateY(8px);
                             ">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span style="font-size: 22px;">${item.emoji || (isFood ? '🍽️' : '📍')}</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div style="
+                                        width: 36px;
+                                        height: 36px;
+                                        background: ${isFood ? '#fff7ed' : '#f0fdfa'};
+                                        border-radius: 8px;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        font-size: 20px;
+                                    ">${item.emoji || (isFood ? '🍽️' : '📍')}</div>
                                     <div>
-                                        <div style="font-size: 14px; font-weight: 600; color: #1e293b;">
+                                        <div style="font-size: 14px; font-weight: 700; color: #1e293b; line-height: 1.2; margin-bottom: 2px;">
                                             ${item.title}
                                         </div>
-                                        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                                        <div style="font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 4px;">
+                                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${dayColor};"></span>
                                             Day ${day.day} · ${item.time_label}
                                         </div>
                                     </div>
@@ -332,11 +369,15 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                         hoverInfoWindowRef.current = new AMap.InfoWindow({
                             content: hoverContent,
-                            offset: new AMap.Pixel(0, -16),
+                            offset: new AMap.Pixel(0, -42),
                             closeWhenClickMap: true,
                             isCustom: true,
                         });
                         hoverInfoWindowRef.current.open(map, lnglat);
+
+                        // 简单的跳动动画
+                        marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                        setTimeout(() => marker.setAnimation('AMAP_ANIMATION_NONE'), 1000);
                     });
 
                     marker.on('mouseout', () => {
@@ -362,13 +403,16 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                 markersRef.current.push(dayMarkers);
 
-                // 路线 - 更粗更明显
+                // 路线 - 双色描边风格
                 if (pathPoints.length > 1) {
                     const polyline = new AMap.Polyline({
                         path: pathPoints,
                         strokeColor: dayColor,
-                        strokeWeight: 8,
-                        strokeOpacity: 0.9,
+                        strokeWeight: 7, // 稍微细一点
+                        strokeOpacity: 1.0,
+                        isOutline: true, // 开启描边
+                        outlineColor: 'white', // 白色描边
+                        borderWeight: 2, // 描边宽度
                         strokeStyle: 'solid',
                         lineJoin: 'round',
                         lineCap: 'round',

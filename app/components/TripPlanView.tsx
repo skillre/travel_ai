@@ -142,7 +142,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     relative h-full flex flex-col bg-white border-r border-slate-200 shadow-xl z-20
                     transition-all duration-300 ease-in-out overflow-hidden
                     ${isSidebarOpen
-                        ? 'w-full md:w-[400px] lg:w-[440px] translate-x-0'
+                        ? 'w-full md:w-[480px] lg:w-[520px] translate-x-0'
                         : 'w-0 -translate-x-full'}
                 `}
             >
@@ -157,12 +157,22 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                 fill
                                 priority
                                 className="object-cover"
-                                sizes="440px"
+                                sizes="520px"
                             />
                         ) : (
                             <div className={`absolute inset-0 bg-gradient-to-br from-teal-400 to-sky-500 ${bgLoading ? 'animate-pulse' : ''}`} />
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+                        {/* 城市徽章 (左上角) */}
+                        <div className="absolute top-4 left-4 z-20">
+                            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full shadow-lg">
+                                <span className="text-lg">📍</span>
+                                <span className="text-sm font-bold text-white tracking-widest uppercase">
+                                    {tripPlan.meta.city}
+                                </span>
+                            </div>
+                        </div>
 
                         {/* 标题 */}
                         <div className="absolute bottom-0 left-0 right-0 p-6 z-10">
