@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, CalendarDays } from 'lucide-react';
+import { useCallback, useEffect } from 'react';
 import { TripPlanDay, TripPlanItem } from '../types';
 import { ItineraryCard } from './ItineraryCard';
 import { preloadImages } from '../hooks/useUnsplashImage';
@@ -9,29 +8,25 @@ import { preloadImages } from '../hooks/useUnsplashImage';
 interface TimelineViewProps {
     timeline: TripPlanDay[];
     city: string;
+    selectedDay?: number | null; // null = 显示全部天
     onItemHover?: (dayIndex: number, itemIndex: number) => void;
     onItemClick?: (dayIndex: number, itemIndex: number, item: TripPlanItem) => void;
 }
 
 // 每天路线的颜色
-// 每天路线的颜色 - Gentle Palette
 const dayColors = [
-    '#95D9AD', // fresh-green-300
-    '#9CCBE6', // tender-blue-300
-    '#FFC8C8', // soft-pink-300
-    '#EBE5D5', // cream-300 (Darker for contrast) -> maybe use a variation
-    '#B8E6D3', // fresh-green-200
-    '#C4E0F0', // tender-blue-200
-    '#FFD7D7', // soft-pink-200
+    '#ef4444', '#f97316', '#eab308', '#22c55e',
+    '#06b6d4', '#8b5cf6', '#ec4899',
 ];
 
 /**
  * 垂直时光轴组件
- * 展示每日行程，包含 Day Header 和 ItemCard 列表
+ * 支持按天筛选显示
  */
 export default function TimelineView({
     timeline,
     city,
+    selectedDay = null,
     onItemHover,
     onItemClick,
 }: TimelineViewProps) {
@@ -52,71 +47,58 @@ export default function TimelineView({
         onItemClick?.(dayIndex, itemIndex, item);
     }, [onItemClick]);
 
-    // 统计信息
-    const totalSpots = timeline.reduce(
-        (acc, day) => acc + day.items.filter(item => item.type === 'spot').length,
-        0
-    );
-    const totalFood = timeline.reduce(
-        (acc, day) => acc + day.items.filter(item => item.type === 'food').length,
-        0
-    );
+    // 根据选中的天筛选显示
+    const visibleTimeline = selectedDay !== null
+        ? timeline.filter((day, index) => index === selectedDay)
+        : timeline;
 
     return (
         <div className="h-full flex flex-col">
-            {/* 顶部统计栏 - Minimalist Border Bottom */}
-            <div className="shrink-0 py-3 px-6 md:px-8 border-b border-slate-100 bg-white sticky top-0 z-30 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">TOTAL</span>
-                    <span className="text-slate-800 font-bold">{timeline.length} Days</span>
-                </div>
-                <div className="flex items-center gap-4 text-xs font-medium">
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md text-slate-500">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                        <span>{totalSpots} Spots</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 rounded-md text-slate-500">
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        <span>{totalFood} Foods</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* 列表内容 (无需 scrollbar，由父级控制) */}
-            <div className="flex-1 px-6 md:px-8 py-6 space-y-12">
-                {timeline.map((day, dayIndex) => {
-                    const dayColor = dayColors[dayIndex % dayColors.length];
+            {/* 列表内容 */}
+            <div className="flex-1 px-4 md:px-6 py-4 space-y-8">
+                {visibleTimeline.map((day, filteredIndex) => {
+                    // 获取原始索引以保持颜色一致
+                    const originalDayIndex = timeline.findIndex(d => d.day === day.day);
+                    const dayColor = dayColors[originalDayIndex % dayColors.length];
 
                     return (
                         <div
                             key={day.day}
                             className="relative animate-fade-in-up"
-                            style={{ animationDelay: `${dayIndex * 100}ms` }}
+                            style={{ animationDelay: `${filteredIndex * 100}ms` }}
                         >
-                            {/* Day Header - Clean Sticky */}
-                            <div className="sticky top-[49px] z-20 flex items-center gap-4 mb-8 bg-white/95 backdrop-blur-sm py-4 -mx-2 px-2 border-b border-slate-50">
-                                {/* 天数徽章 - Clean */}
-                                <div className="flex flex-col items-center">
-                                    <span className="text-xs text-slate-400 font-bold tracking-wider">DAY</span>
-                                    <span className="text-3xl font-black text-slate-800 leading-none">{day.day}</span>
+                            {/* Day Header - 简洁设计 */}
+                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
+                                {/* 天数徽章 */}
+                                <div
+                                    className="flex items-center justify-center w-12 h-12 rounded-xl text-white font-bold shadow-md"
+                                    style={{ backgroundColor: dayColor }}
+                                >
+                                    <div className="text-center">
+                                        <span className="text-[10px] block leading-none opacity-80">DAY</span>
+                                        <span className="text-xl leading-none">{day.day}</span>
+                                    </div>
                                 </div>
 
                                 {/* 主题信息 */}
-                                <div className="flex-1 min-w-0 pl-2 border-l-2 border-slate-100 ml-2">
-                                    <h3 className="text-slate-800 font-bold text-lg truncate">
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-slate-800 font-bold text-base leading-tight">
                                         {day.date_theme}
                                     </h3>
-                                    <p className="text-slate-500 text-sm line-clamp-1 font-medium">
+                                    <p className="text-slate-500 text-sm mt-0.5 line-clamp-2">
                                         {day.day_summary}
                                     </p>
                                 </div>
                             </div>
 
                             {/* 时间轴线 */}
-                            <div className="absolute left-[18px] top-[80px] bottom-0 w-0.5 bg-slate-100 z-0" />
+                            <div
+                                className="absolute left-[22px] top-[70px] bottom-0 w-0.5 z-0"
+                                style={{ backgroundColor: `${dayColor}30` }}
+                            />
 
-                            {/* 时间轴 + 卡片列表 */}
-                            <div className="relative space-y-8 pl-2">
+                            {/* 卡片列表 */}
+                            <div className="relative space-y-4 pl-1">
                                 {day.items.map((item, itemIndex) => (
                                     <ItineraryCard
                                         key={itemIndex}
@@ -124,8 +106,8 @@ export default function TimelineView({
                                         city={city}
                                         dayColor={dayColor}
                                         isFirst={itemIndex === 0}
-                                        onHover={() => handleItemHover(dayIndex, itemIndex)}
-                                        onClick={() => handleItemClick(dayIndex, itemIndex, item)}
+                                        onHover={() => handleItemHover(originalDayIndex, itemIndex)}
+                                        onClick={() => handleItemClick(originalDayIndex, itemIndex, item)}
                                     />
                                 ))}
                             </div>
@@ -134,9 +116,9 @@ export default function TimelineView({
                 })}
 
                 {/* 结束标记 */}
-                <div className="text-center py-12">
+                <div className="text-center py-8">
                     <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-full text-slate-400 text-sm">
-                        <span>End of Trip</span>
+                        <span>行程结束</span>
                         <span>✨</span>
                     </div>
                 </div>

@@ -143,7 +143,7 @@ function ItineraryCardComponent({
                             <div className="flex items-start justify-between gap-2 mb-1.5">
                                 <h3
                                     className={`
-                                        font-bold text-[15px] sm:text-base leading-snug line-clamp-1
+                                        font-bold text-sm sm:text-[15px] leading-snug line-clamp-2
                                         transition-colors
                                         ${isActive
                                             ? 'text-teal-600'
@@ -213,7 +213,7 @@ function ItineraryCardComponent({
                             >
                                 <div className="flex items-start gap-1.5">
                                     <span className="shrink-0 mt-0.5">{isFood ? '🍽️' : '💡'}</span>
-                                    <span className="line-clamp-2">{item.content.highlight_text}</span>
+                                    <span className="line-clamp-3">{item.content.highlight_text}</span>
                                 </div>
                             </div>
                         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { X, Clock, ArrowRight, RefreshCw, Inbox } from 'lucide-react';
 
 interface HistoryRecord {
     id: string;
@@ -69,51 +70,52 @@ export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: Histor
         <>
             {/* 背景遮罩 */}
             <div
-                className={`fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
                     }`}
                 onClick={onClose}
             />
 
-            {/* 侧边面板 */}
+            {/* 侧边面板 - 浅色主题 */}
             <div
-                className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-slate-900 border-l border-white/10 z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'
+                className={`fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'
                     }`}
             >
                 {/* 头部 */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                        <span>📚</span>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+                    <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-teal-500" />
                         历史记录
                     </h2>
                     <button
                         onClick={onClose}
-                        className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
+                        className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
                     >
-                        ✕
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* 内容区域 */}
-                <div className="h-[calc(100%-64px)] overflow-y-auto p-4">
+                <div className="h-[calc(100%-64px)] overflow-y-auto p-4 bg-slate-50/50">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
-                            <div className="w-10 h-10 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-gray-400">加载中...</p>
+                            <div className="w-10 h-10 border-3 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                            <p className="text-slate-500">加载中...</p>
                         </div>
                     ) : error ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
                             <span className="text-4xl">😔</span>
-                            <p className="text-red-400">{error}</p>
+                            <p className="text-red-500">{error}</p>
                             <button
                                 onClick={fetchHistory}
-                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm text-white transition-colors"
+                                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 rounded-lg text-sm text-white transition-colors flex items-center gap-2"
                             >
+                                <RefreshCw className="w-4 h-4" />
                                 重试
                             </button>
                         </div>
                     ) : records.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-500">
-                            <span className="text-4xl">📭</span>
+                        <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400">
+                            <Inbox className="w-12 h-12" />
                             <p>暂无历史记录</p>
                         </div>
                     ) : (
@@ -124,29 +126,32 @@ export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: Histor
                                     onClick={() => handleSelectRecord(record)}
                                     disabled={!record.has_plan_data}
                                     className={`w-full text-left p-4 rounded-xl border transition-all ${record.has_plan_data
-                                            ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-cyan-500/50 cursor-pointer'
-                                            : 'bg-white/5 border-white/5 opacity-50 cursor-not-allowed'
+                                        ? 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-md cursor-pointer'
+                                        : 'bg-slate-50 border-slate-100 opacity-50 cursor-not-allowed'
                                         }`}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-white font-medium truncate">
+                                            <h3 className="text-slate-800 font-semibold truncate">
                                                 {record.title}
                                             </h3>
-                                            <p className="text-xs text-gray-500 mt-1">
+                                            <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
                                                 {formatDate(record.created_time)}
                                             </p>
                                         </div>
                                         {record.has_plan_data ? (
-                                            <span className="shrink-0 text-cyan-400 text-lg">→</span>
+                                            <div className="shrink-0 w-8 h-8 rounded-full bg-teal-50 text-teal-500 flex items-center justify-center">
+                                                <ArrowRight className="w-4 h-4" />
+                                            </div>
                                         ) : (
-                                            <span className="shrink-0 text-xs text-gray-500 px-2 py-1 bg-white/5 rounded">
+                                            <span className="shrink-0 text-xs text-slate-400 px-2 py-1 bg-slate-100 rounded">
                                                 无数据
                                             </span>
                                         )}
                                     </div>
                                     {record.workflow_run_id && (
-                                        <p className="text-xs text-gray-600 mt-2 font-mono truncate">
+                                        <p className="text-[10px] text-slate-300 mt-2 font-mono truncate">
                                             ID: {record.workflow_run_id.substring(0, 16)}...
                                         </p>
                                     )}
