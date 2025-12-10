@@ -26,6 +26,31 @@ interface UnsplashResponse {
 const imageCache = new Map<string, { url: string; timestamp: number }>();
 const CACHE_TTL = 1000 * 60 * 60; // 1小时缓存
 
+/**
+ * 根据关键词生成一个稳定的数字种子
+ * 确保相同的景点名称总是返回相同的占位图
+ */
+function generateSeedFromQuery(query: string): number {
+    let hash = 0;
+    for (let i = 0; i < query.length; i++) {
+        const char = query.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    // 确保是正数，并且在 1-1000 范围内（picsum 有 ~1000 张图片）
+    return Math.abs(hash % 1000) + 1;
+}
+
+/**
+ * 生成可靠的占位图 URL
+ * 使用 picsum.photos 服务，该服务稳定可靠
+ */
+function getFallbackImageUrl(query: string): string {
+    const seed = generateSeedFromQuery(query);
+    // 使用 picsum.photos，基于种子生成稳定的风景图片
+    return `https://picsum.photos/seed/${seed}/800/600`;
+}
+
 export async function GET(request: NextRequest) {
     try {
         const searchParams = request.nextUrl.searchParams;
@@ -48,7 +73,7 @@ export async function GET(request: NextRequest) {
 
         if (!accessKey) {
             // 如果没有配置 Unsplash API，返回占位图
-            const fallbackUrl = `https://source.unsplash.com/featured/800x600?${encodeURIComponent(query)},travel`;
+            const fallbackUrl = getFallbackImageUrl(query);
             return NextResponse.json({
                 success: true,
                 imageUrl: fallbackUrl,
@@ -69,7 +94,7 @@ export async function GET(request: NextRequest) {
         if (!response.ok) {
             console.error('Unsplash API error:', response.status);
             // 返回占位图
-            const fallbackUrl = `https://source.unsplash.com/featured/800x600?${encodeURIComponent(query)},travel`;
+            const fallbackUrl = getFallbackImageUrl(query);
             return NextResponse.json({
                 success: true,
                 imageUrl: fallbackUrl,
@@ -92,7 +117,10 @@ export async function GET(request: NextRequest) {
             });
         } else {
             // 没有找到图片，返回占位图
-            const fallbackUrl = `https://source.unsplash.com/featured/800x600?${encodeURIComponent(query)},travel`;
+            const fallbackUrl = getFallbackImageUrl(query);
+            // 也缓存占位图结果，避免重复请求 Unsplash API
+            imageCache.set(query, { url: fallbackUrl, timestamp: Date.now() });
+
             return NextResponse.json({
                 success: true,
                 imageUrl: fallbackUrl,
@@ -104,7 +132,7 @@ export async function GET(request: NextRequest) {
         console.error('Image search error:', error);
         // 出错时返回占位图
         const query = request.nextUrl.searchParams.get('query') || 'travel';
-        const fallbackUrl = `https://source.unsplash.com/featured/800x600?${encodeURIComponent(query)},travel`;
+        const fallbackUrl = getFallbackImageUrl(query);
         return NextResponse.json({
             success: true,
             imageUrl: fallbackUrl,
