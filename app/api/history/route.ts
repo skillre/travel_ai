@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
                         },
                     ],
                 }),
+                cache: 'no-store', // 禁用 Next.js 服务端缓存
             }
         );
 

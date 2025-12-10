@@ -160,6 +160,7 @@ export async function GET(
                     'Authorization': `Bearer ${notionKey}`,
                     'Notion-Version': '2022-06-28',
                 },
+                cache: 'no-store', // 禁用 Next.js 服务端缓存
             }
         );
 
