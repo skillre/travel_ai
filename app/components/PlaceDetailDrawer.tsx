@@ -82,15 +82,15 @@ export default function PlaceDetailDrawer({
                         <X className="w-5 h-5" />
                     </button>
 
-                    {/* 顶部标签 - 移动到左上角 */}
+                    {/* 顶部标签 - 显示景点/餐厅名称 */}
                     <div className={`
-                        absolute top-4 left-4 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md z-20 border border-white/10
+                        absolute top-4 left-4 px-3 py-1.5 rounded-full text-sm font-bold backdrop-blur-md z-20 border border-white/20 max-w-[200px] truncate
                         ${isFood
                             ? 'bg-orange-500/90 text-white shadow-lg'
                             : 'bg-teal-500/90 text-white shadow-lg'
                         }
                     `}>
-                        {isFood ? '美食推荐' : '景点详情'}
+                        {item?.title || (isFood ? '美食推荐' : '景点详情')}
                     </div>
 
                     {/* 标题内容 (覆盖在图片上) */}

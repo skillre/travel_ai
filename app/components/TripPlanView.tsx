@@ -179,11 +179,11 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
-                        {/* 城市徽章 (左上角) */}
-                        <div className="absolute top-4 left-4 z-20">
-                            <div className="flex items-center gap-1 bg-white/10 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full shadow-lg">
-                                <span className="text-lg">📍</span>
-                                <span className="text-sm font-bold text-white tracking-widest uppercase">
+                        {/* 城市徽章 (左上角) - 上移位置，增强对比度 */}
+                        <div className="absolute top-2 left-3 z-20">
+                            <div className="flex items-center gap-1.5 bg-black/30 backdrop-blur-md border border-white/30 px-3 py-1 rounded-full shadow-lg">
+                                <span className="text-base">📍</span>
+                                <span className="text-sm font-bold text-white tracking-wide drop-shadow-md">
                                     {tripPlan.meta.city}
                                 </span>
                             </div>
@@ -201,14 +201,17 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     </div>
 
                     {/* 元数据条 */}
-                    <div className="flex items-center gap-2 p-3 bg-white border-b border-slate-100 overflow-x-auto">
-                        <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 rounded-full border border-emerald-100">
-                            <Coins className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-xs font-semibold text-emerald-700">¥{tripPlan.meta.total_estimated_cost}</span>
+                    <div className="flex flex-col gap-2 p-3 bg-white border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+                                <Coins className="w-3.5 h-3.5 text-emerald-600" />
+                                <span className="text-xs font-semibold text-emerald-700">¥{tripPlan.meta.total_estimated_cost}</span>
+                            </div>
                         </div>
-                        <div className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 py-1 bg-sky-50 rounded-full border border-sky-100">
-                            <Lightbulb className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                            <span className="text-xs text-sky-700 truncate">{tripPlan.meta.suggestion}</span>
+                        {/* 建议事项 - 完整显示 */}
+                        <div className="flex items-start gap-1.5 px-2.5 py-2 bg-sky-50 rounded-lg border border-sky-100">
+                            <Lightbulb className="w-3.5 h-3.5 text-sky-500 shrink-0 mt-0.5" />
+                            <span className="text-xs text-sky-700 leading-relaxed">{tripPlan.meta.suggestion}</span>
                         </div>
                     </div>
 
