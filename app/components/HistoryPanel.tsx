@@ -33,7 +33,9 @@ export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: Histor
         setError(null);
 
         try {
-            const response = await fetch('/api/history');
+            const response = await fetch('/api/history', {
+                cache: 'no-store',
+            });
             const result = await response.json();
 
             if (!response.ok) {

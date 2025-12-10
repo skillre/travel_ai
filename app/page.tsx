@@ -122,7 +122,9 @@ export default function Home() {
         setError(null);
 
         try {
-            const response = await fetch(`/api/history/${pageId}`);
+            const response = await fetch(`/api/history/${pageId}`, {
+                cache: 'no-store',
+            });
             const result = await response.json();
 
             if (!response.ok) {

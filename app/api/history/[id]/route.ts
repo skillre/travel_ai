@@ -215,6 +215,10 @@ export async function GET(
             success: true,
             data: planData,
             title: title,
+        }, {
+            headers: {
+                'Cache-Control': 'no-store, no-cache, must-revalidate',
+            },
         });
 
     } catch (error) {
