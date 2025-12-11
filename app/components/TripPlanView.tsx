@@ -8,6 +8,7 @@ import { TripPlan, TripPlanItem } from '../types';
 import TimelineView from './TimelineView';
 import PlaceDetailDrawer from './PlaceDetailDrawer';
 import MobileBottomSheet from './MobileBottomSheet';
+import DayOverviewBanner from './DayOverviewBanner';
 
 // 动态导入地图组件
 const MapContainerNew = dynamic(() => import('./MapContainerNew'), {
@@ -51,7 +52,6 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const [selectedDay, setSelectedDay] = useState<number | null>(null); // null = 全部天
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const [bgLoading, setBgLoading] = useState(true);
-    const [isBannerExpanded, setIsBannerExpanded] = useState(true);
 
     // 详情抽屉状态
     const [selectedDetailItem, setSelectedDetailItem] = useState<TripPlanItem | null>(null);
@@ -185,62 +185,16 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         />
                     </div>
 
-                    {/* ===== 悬浮顶栏 (Floating Header) - 只显示城市信息和天数切换 ===== */}
-                    <div className="absolute top-0 left-0 right-0 z-30 safe-area-top pointer-events-none">
-                        <div className="mx-3 mt-3 px-3 py-2.5 bg-white/90 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 pointer-events-auto">
-                            {/* 城市名称 + 统计数据 */}
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-base">📍</span>
-                                    <h1 className="font-bold text-slate-800 text-sm leading-tight">{tripPlan.meta.city}</h1>
-                                </div>
-                                <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                    <span className="font-bold text-slate-700">{tripPlan.timeline.length}</span>天
-                                    <span className="mx-0.5">·</span>
-                                    <span className="font-bold text-teal-600">{totalSpots}</span>景点
-                                    <span className="mx-0.5">·</span>
-                                    <span className="font-bold text-orange-600">{totalFood}</span>美食
-                                </div>
-                            </div>
-
-                            {/* 天数切换按钮 */}
-                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isBannerExpanded ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'}`}>
-                                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
-                                    <button
-                                        onClick={() => handleSelectDay(null)}
-                                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === null
-                                            ? 'bg-slate-800 text-white shadow-sm'
-                                            : 'bg-slate-100 text-slate-600'
-                                            }`}
-                                    >
-                                        <Layers className="w-3 h-3" />
-                                        全部
-                                    </button>
-                                    {tripPlan.timeline.map((day, index) => (
-                                        <button
-                                            key={day.day}
-                                            onClick={() => handleSelectDay(index)}
-                                            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
-                                                ? 'text-white shadow-sm'
-                                                : 'bg-slate-100 text-slate-600'
-                                                }`}
-                                            style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
-                                        >
-                                            D{day.day}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* 折叠切换按钮 (底部小条) */}
-                            <div className="flex justify-center -mb-1 mt-1">
-                                <button
-                                    onClick={() => setIsBannerExpanded(!isBannerExpanded)}
-                                    className="w-8 h-1 bg-slate-200 rounded-full active:bg-slate-300 transition-colors"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    {/* ===== 悬浮顶栏 (Floating Header) - 可折叠 ===== */}
+                    <DayOverviewBanner
+                        city={tripPlan.meta.city}
+                        days={tripPlan.timeline.length}
+                        totalSpots={totalSpots}
+                        totalFood={totalFood}
+                        selectedDay={selectedDay}
+                        timeline={tripPlan.timeline}
+                        onSelectDay={handleSelectDay}
+                    />
 
                     {/* ===== 底部抽屉面板 (行程列表) ===== */}
                     <MobileBottomSheet>

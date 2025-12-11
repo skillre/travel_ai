@@ -23,6 +23,7 @@ export default function PlaceDetailDrawer({
 }: PlaceDetailDrawerProps) {
     const isFood = item?.type === 'food';
     const [isVisible, setIsVisible] = useState(false);
+    const [showMapSheet, setShowMapSheet] = useState(false);
 
     // 动画控制
     useEffect(() => {
@@ -155,25 +156,20 @@ export default function PlaceDetailDrawer({
                                 </div>
                             )}
                             {item?.address && (
-                                <div className="flex gap-2">
-                                    <a
-                                        href={`https://uri.amap.com/marker?position=${item.location?.lng},${item.location?.lat}&name=${item.title}&callnative=1`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-teal-700 bg-teal-50 active:bg-teal-100 active:scale-[0.98] transition-all py-2.5 rounded-xl border border-teal-100"
-                                    >
-                                        <MapPin className="w-3.5 h-3.5" />
-                                        高德地图
-                                    </a>
-                                    <a
-                                        href={`http://api.map.baidu.com/marker?location=${item.location?.lat},${item.location?.lng}&title=${item.title}&content=${item.address}&output=html&src=webapp.baidu.openAPIdemo`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 active:bg-blue-100 active:scale-[0.98] transition-all py-2.5 rounded-xl border border-blue-100"
-                                    >
-                                        <MapPin className="w-3.5 h-3.5" />
-                                        百度地图
-                                    </a>
+                                <div
+                                    onClick={() => setShowMapSheet(true)}
+                                    className="flex items-start gap-2 text-sm text-slate-600 active:bg-slate-50 active:scale-[0.98] transition-all p-2 -mx-2 rounded-lg cursor-pointer"
+                                >
+                                    <MapPin className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
+                                    <span className="flex-1">
+                                        {item.address}
+                                        <span className="inline-block ml-2 text-xs text-teal-600 font-medium bg-teal-50 px-1.5 py-0.5 rounded">
+                                            导航
+                                        </span>
+                                    </span>
+                                    <div className="shrink-0 text-slate-300">
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -181,6 +177,50 @@ export default function PlaceDetailDrawer({
 
                     {/* 底部安全区域 */}
                     <div className="shrink-0 safe-area-bottom bg-white" />
+
+                    {/* 地图选择 Action Sheet */}
+                    {showMapSheet && (
+                        <div className="fixed inset-0 z-[2000] flex flex-col justify-end">
+                            {/* 背景 */}
+                            <div
+                                className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+                                onClick={() => setShowMapSheet(false)}
+                            />
+
+                            {/* 菜单 */}
+                            <div className="relative bg-slate-100 rounded-t-2xl overflow-hidden animate-slide-up">
+                                <div className="p-4 text-center text-slate-500 text-xs font-medium border-b border-slate-200/50 bg-white">
+                                    导航到 {item?.title}
+                                </div>
+                                <div className="flex flex-col gap-[1px] bg-slate-200/50">
+                                    <a
+                                        href={`iosamap://navi?sourceApplication=webapp&lat=${item?.location?.lat}&lon=${item?.location?.lng}&name=${item?.title}&dev=0`}
+                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50"
+                                        onClick={() => setTimeout(() => setShowMapSheet(false), 300)}
+                                    >
+                                        高德地图
+                                    </a>
+                                    <a
+                                        href={`baidumap://map/marker?location=${item?.location?.lat},${item?.location?.lng}&title=${item?.title}&content=${item?.title}&src=webapp`}
+                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50"
+                                        onClick={() => setTimeout(() => setShowMapSheet(false), 300)}
+                                    >
+                                        百度地图
+                                    </a>
+                                </div>
+                                <div className="mt-2 text-center bg-white">
+                                    <button
+                                        className="w-full py-4 text-slate-500 font-medium text-base active:bg-slate-50"
+                                        onClick={() => setShowMapSheet(false)}
+                                    >
+                                        取消
+                                    </button>
+                                </div>
+                                {/* 底部安全区 */}
+                                <div className="bg-white h-safe-bottom" />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </>
         );
