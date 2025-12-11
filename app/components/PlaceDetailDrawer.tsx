@@ -155,10 +155,23 @@ export default function PlaceDetailDrawer({
                                 </div>
                             )}
                             {item?.address && (
-                                <div className="flex items-start gap-2 text-sm text-slate-600">
+                                <a
+                                    href={`https://uri.amap.com/marker?position=${item.location?.lng},${item.location?.lat}&name=${item.title}&callnative=1`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-start gap-2 text-sm text-slate-600 active:bg-slate-50 active:scale-[0.98] transition-all p-2 -mx-2 rounded-lg"
+                                >
                                     <MapPin className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
-                                    <span>{item.address}</span>
-                                </div>
+                                    <span className="flex-1">
+                                        {item.address}
+                                        <span className="inline-block ml-2 text-xs text-teal-600 font-medium bg-teal-50 px-1.5 py-0.5 rounded">
+                                            导航
+                                        </span>
+                                    </span>
+                                    <div className="shrink-0 text-slate-300">
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                    </div>
+                                </a>
                             )}
                         </div>
                     </div>
@@ -307,10 +320,7 @@ export default function PlaceDetailDrawer({
                                     <span className="leading-relaxed">{item.address}</span>
                                 </div>
                             )}
-                            <div className="flex items-center gap-3 text-sm text-slate-600">
-                                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                                <span>{item?.sub_title || '查看地图定位'}</span>
-                            </div>
+
                         </div>
 
                         {/* 功能按钮 */}

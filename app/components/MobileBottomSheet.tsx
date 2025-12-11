@@ -1,176 +1,139 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect, ReactNode } from 'react';
+import { useRef, useState, useCallback, ReactNode, useEffect } from 'react';
 
-// 抽屉状态
-type SheetState = 'collapsed' | 'half' | 'expanded';
+// 抽屉状态 - 简化为两个状态
+type SheetState = 'collapsed' | 'expanded';
 
 // 高度配置 (vh)
 const SHEET_HEIGHTS: Record<SheetState, number> = {
-    collapsed: 38,  // 约 38% - 显示 Header + 一个卡片预览
-    half: 60,       // 约 60% - 中间状态
-    expanded: 92,   // 约 92% - 几乎全屏，留出顶部空间看地图
+    collapsed: 40,  // 约 40% - 显示一些卡片预览
+    expanded: 88,   // 约 88% - 展开显示更多内容
 };
 
-// 速度阈值 (px/ms) - 快速滑动触发状态切换
-const VELOCITY_THRESHOLD = 0.5;
+// 最小拖拽距离触发切换 (px)
+const DRAG_THRESHOLD = 50;
 
 interface MobileBottomSheetProps {
     children: ReactNode;
-    headerContent?: ReactNode;
-    onStateChange?: (state: SheetState) => void;
 }
 
-export default function MobileBottomSheet({
-    children,
-    headerContent,
-    onStateChange,
-}: MobileBottomSheetProps) {
+export default function MobileBottomSheet({ children }: MobileBottomSheetProps) {
     const [sheetState, setSheetState] = useState<SheetState>('collapsed');
     const [isDragging, setIsDragging] = useState(false);
-    const [dragOffset, setDragOffset] = useState(0);
+    const [translateY, setTranslateY] = useState(0);
 
-    const sheetRef = useRef<HTMLDivElement>(null);
+    const handleRef = useRef<HTMLDivElement>(null);
     const startYRef = useRef(0);
-    const startTimeRef = useRef(0);
-    const currentHeightRef = useRef(SHEET_HEIGHTS.collapsed);
+    const lastYRef = useRef(0);
 
-    // 计算当前高度
-    const getCurrentHeight = useCallback(() => {
-        return SHEET_HEIGHTS[sheetState];
-    }, [sheetState]);
+    // 锁定背景滚动
+    useEffect(() => {
+        // 禁止 body 滚动
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
 
-    // 更新状态
-    const updateState = useCallback((newState: SheetState) => {
-        setSheetState(newState);
-        currentHeightRef.current = SHEET_HEIGHTS[newState];
-        onStateChange?.(newState);
-    }, [onStateChange]);
+        return () => {
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
+        };
+    }, []);
 
-    // 根据位置和速度判断目标状态
-    const determineTargetState = useCallback((
-        currentPosition: number,
-        velocity: number
-    ): SheetState => {
-        const windowHeight = window.innerHeight;
-        const currentHeightVh = (currentPosition / windowHeight) * 100;
-
-        // 快速向上滑动
-        if (velocity < -VELOCITY_THRESHOLD) {
-            if (sheetState === 'collapsed') return 'half';
-            return 'expanded';
-        }
-
-        // 快速向下滑动
-        if (velocity > VELOCITY_THRESHOLD) {
-            if (sheetState === 'expanded') return 'half';
-            return 'collapsed';
-        }
-
-        // 根据位置判断
-        if (currentHeightVh > 75) return 'expanded';
-        if (currentHeightVh > 48) return 'half';
-        return 'collapsed';
-    }, [sheetState]);
-
-    // 触摸开始
+    // 只在 Handle 区域处理拖拽
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
         const touch = e.touches[0];
         startYRef.current = touch.clientY;
-        startTimeRef.current = Date.now();
-        currentHeightRef.current = SHEET_HEIGHTS[sheetState];
+        lastYRef.current = touch.clientY;
         setIsDragging(true);
-    }, [sheetState]);
+    }, []);
 
-    // 触摸移动
     const handleTouchMove = useCallback((e: React.TouchEvent) => {
         if (!isDragging) return;
 
+        e.preventDefault(); // 阻止默认滚动行为
+
         const touch = e.touches[0];
-        const deltaY = startYRef.current - touch.clientY;
-        setDragOffset(deltaY);
+        const deltaY = touch.clientY - startYRef.current;
+        lastYRef.current = touch.clientY;
+
+        // 限制拖拽范围
+        const maxDrag = window.innerHeight * 0.5;
+        const limitedDelta = Math.max(-maxDrag, Math.min(maxDrag, deltaY));
+        setTranslateY(limitedDelta);
     }, [isDragging]);
 
-    // 触摸结束
     const handleTouchEnd = useCallback(() => {
         if (!isDragging) return;
 
-        const endTime = Date.now();
-        const duration = endTime - startTimeRef.current;
-        const velocity = dragOffset / duration; // px/ms
-
-        const windowHeight = window.innerHeight;
-        const currentHeightPx = (currentHeightRef.current / 100) * windowHeight + dragOffset;
-
-        const targetState = determineTargetState(currentHeightPx, velocity);
-        updateState(targetState);
+        // 根据拖拽距离决定目标状态
+        if (sheetState === 'collapsed') {
+            // 当前是折叠状态，向上拖超过阈值则展开
+            if (translateY < -DRAG_THRESHOLD) {
+                setSheetState('expanded');
+            }
+        } else {
+            // 当前是展开状态，向下拖超过阈值则折叠
+            if (translateY > DRAG_THRESHOLD) {
+                setSheetState('collapsed');
+            }
+        }
 
         setIsDragging(false);
-        setDragOffset(0);
-    }, [isDragging, dragOffset, determineTargetState, updateState]);
+        setTranslateY(0);
+    }, [isDragging, sheetState, translateY]);
 
-    // Handle 点击切换状态
+    // Handle 点击切换
     const handleHandleClick = useCallback(() => {
-        if (sheetState === 'collapsed') {
-            updateState('expanded');
-        } else {
-            updateState('collapsed');
-        }
-    }, [sheetState, updateState]);
+        setSheetState(prev => prev === 'collapsed' ? 'expanded' : 'collapsed');
+    }, []);
 
     // 计算实际高度
-    const baseHeight = SHEET_HEIGHTS[sheetState];
-    const draggedHeightVh = isDragging
-        ? baseHeight + (dragOffset / window.innerHeight) * 100
-        : baseHeight;
-    const finalHeight = Math.max(30, Math.min(95, draggedHeightVh));
+    const baseHeightVh = SHEET_HEIGHTS[sheetState];
+    const dragOffsetVh = isDragging ? (-translateY / window.innerHeight) * 100 : 0;
+    const finalHeightVh = Math.max(35, Math.min(92, baseHeightVh + dragOffsetVh));
 
-    // 阻止内容区域触摸事件冒泡到拖拽层
-    const handleContentTouch = useCallback((e: React.TouchEvent) => {
-        // 只有在内容区域顶部且向下滑动时才允许拖拽关闭
-        const target = e.target as HTMLElement;
-        const scrollContainer = target.closest('.sheet-content');
-        if (scrollContainer && scrollContainer.scrollTop > 0) {
-            e.stopPropagation();
-        }
+    // 阻止内容区域的触摸事件传播到 sheet
+    const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
+        e.stopPropagation();
     }, []);
 
     return (
         <div
-            ref={sheetRef}
             className={`
-                fixed bottom-0 left-0 right-0 z-50
-                bg-white rounded-t-3xl shadow-2xl
-                flex flex-col overflow-hidden
-                ${isDragging ? '' : 'transition-all duration-300 ease-out'}
+                fixed bottom-0 left-0 right-0 z-40
+                bg-white rounded-t-[24px] shadow-2xl
+                flex flex-col
+                ${isDragging ? '' : 'transition-[height] duration-300 ease-out'}
             `}
             style={{
-                height: `${finalHeight}vh`,
-                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.15)',
+                height: `${finalHeightVh}vh`,
+                boxShadow: '0 -8px 30px rgba(0, 0, 0, 0.12)',
             }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
         >
-            {/* Handle 拖拽提示条 */}
+            {/* Handle 拖拽区域 - 只有这里响应拖拽 */}
             <div
-                className="shrink-0 flex flex-col items-center pt-3 pb-2 cursor-grab active:cursor-grabbing"
+                ref={handleRef}
+                className="shrink-0 flex flex-col items-center py-3 cursor-grab active:cursor-grabbing touch-none"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
                 onClick={handleHandleClick}
             >
-                <div className="w-10 h-1 bg-slate-300 rounded-full" />
+                <div className="w-10 h-1.5 bg-slate-300 rounded-full" />
             </div>
 
-            {/* Header 区域 (如城市信息、天数选择器) */}
-            {headerContent && (
-                <div className="shrink-0 border-b border-slate-100">
-                    {headerContent}
-                </div>
-            )}
-
-            {/* 可滚动内容区域 */}
+            {/* 内容区域 - 独立滚动，不影响拖拽 */}
             <div
-                className="sheet-content flex-1 overflow-y-auto overscroll-contain"
-                onTouchStart={handleContentTouch}
+                className="flex-1 overflow-y-auto overscroll-contain"
+                onTouchStart={handleContentTouchStart}
+                style={{
+                    WebkitOverflowScrolling: 'touch',
+                    touchAction: 'pan-y',
+                }}
             >
                 {children}
             </div>
