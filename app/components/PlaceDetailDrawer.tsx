@@ -35,10 +35,17 @@ export default function PlaceDetailDrawer({
     const [isVisible, setIsVisible] = useState(false);
     const [showMapSheet, setShowMapSheet] = useState(false);
 
+    // 拖拽相关状态
+    const [dragY, setDragY] = useState(0);
+    const [isDragging, setIsDragging] = useState(false);
+    const startY = useRef(0);
+    const currentY = useRef(0);
+
     // 动画控制
     useEffect(() => {
         if (isOpen) {
             setIsVisible(true);
+            setDragY(0); // Reset drag on open
         } else {
             const timer = setTimeout(() => setIsVisible(false), 300);
             return () => clearTimeout(timer);
@@ -51,6 +58,35 @@ export default function PlaceDetailDrawer({
         city,
         item?.type || 'spot'
     );
+
+    // 拖拽事件处理
+    const handleTouchStart = (e: React.TouchEvent) => {
+        setIsDragging(true);
+        startY.current = e.touches[0].clientY;
+        currentY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (!isDragging) return;
+        const touchY = e.touches[0].clientY;
+        const deltaY = touchY - startY.current;
+
+        // 只允许向下拖拽
+        if (deltaY > 0) {
+            setDragY(deltaY);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        setIsDragging(false);
+        // 如果拖动超过 100px，则关闭
+        if (dragY > 100) {
+            onClose();
+        } else {
+            // 否则回弹
+            setDragY(0);
+        }
+    };
 
     if (!item && !isVisible) return null;
 
@@ -75,58 +111,72 @@ export default function PlaceDetailDrawer({
                     className={`
                         fixed inset-x-0 bottom-0 z-[1000] max-h-[90vh]
                         bg-white rounded-t-3xl shadow-2xl
-                        transform transition-transform duration-300 ease-out
                         flex flex-col overflow-hidden
                         ${isOpen ? 'translate-y-0' : 'translate-y-full'}
                     `}
+                    style={{
+                        transform: isOpen ? `translateY(${dragY}px)` : 'translateY(100%)',
+                        transition: isDragging ? 'none' : 'transform 0.3s ease-out'
+                    }}
                 >
-                    {/* Handle 拖拽提示 */}
-                    <div className="shrink-0 flex justify-center pt-3 pb-1" onClick={onClose}>
-                        <div className="w-10 h-1 bg-slate-300 rounded-full" />
-                    </div>
+                    {/* 可拖拽区域 wrapper (Handle + Image) */}
+                    <div
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        className="shrink-0 cursor-grab active:cursor-grabbing touch-none relative"
+                    >
+                        {/* Handle 拖拽提示 */}
+                        <div className="flex justify-center pt-3 pb-1" onClick={onClose}>
+                            <div className="w-10 h-1 bg-slate-300 rounded-full" />
+                        </div>
 
-                    {/* 顶部图片区域 - 移动端更紧凑 */}
-                    <div className="relative h-44 bg-slate-100 shrink-0 group">
-                        {imageUrl ? (
-                            <Image
-                                src={imageUrl}
-                                alt={item?.title || ''}
-                                fill
-                                className="object-cover"
-                                priority
-                            />
-                        ) : (
-                            <div className={`absolute inset-0 flex items-center justify-center text-4xl ${isFood ? 'bg-orange-50' : 'bg-teal-50'}`}>
-                                {item?.emoji}
-                            </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                        {/* 顶部图片区域 - 移动端更紧凑 */}
+                        <div className="relative h-44 bg-slate-100 group">
+                            {imageUrl ? (
+                                <Image
+                                    src={imageUrl}
+                                    alt={item?.title || ''}
+                                    fill
+                                    className="object-cover"
+                                    priority
+                                />
+                            ) : (
+                                <div className={`absolute inset-0 flex items-center justify-center text-4xl ${isFood ? 'bg-orange-50' : 'bg-teal-50'}`}>
+                                    {item?.emoji}
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
 
-                        {/* 关闭按钮 */}
-                        <button
-                            onClick={onClose}
-                            className="absolute top-3 right-3 p-2 bg-black/30 backdrop-blur-sm rounded-full text-white z-20"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
+                            {/* 关闭按钮 */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onClose();
+                                }}
+                                className="absolute top-3 right-3 p-2 bg-black/30 backdrop-blur-sm rounded-full text-white z-20 active:scale-95 transition-transform"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
 
-                        {/* 标题 */}
-                        <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                            <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold mb-2 ${isFood ? 'bg-orange-500 text-white' : 'bg-teal-500 text-white'}`}>
-                                {isFood ? '美食' : '景点'}
-                            </div>
-                            <h2 className="text-xl font-bold text-white leading-tight drop-shadow-md">
-                                {item?.title}
-                            </h2>
-                            <div className="flex items-center gap-2 mt-1.5 text-sm">
-                                <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs">
-                                    {item?.time_label}
-                                </span>
-                                {item?.cost ? (
-                                    <span className="text-emerald-300 font-bold text-sm">¥{item.cost}</span>
-                                ) : (
-                                    <span className="text-white/80 text-xs">免费</span>
-                                )}
+                            {/* 标题 */}
+                            <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                                <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold mb-2 ${isFood ? 'bg-orange-500 text-white' : 'bg-teal-500 text-white'}`}>
+                                    {isFood ? '美食' : '景点'}
+                                </div>
+                                <h2 className="text-xl font-bold text-white leading-tight drop-shadow-md">
+                                    {item?.title}
+                                </h2>
+                                <div className="flex items-center gap-2 mt-1.5 text-sm">
+                                    <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs">
+                                        {item?.time_label}
+                                    </span>
+                                    {item?.cost ? (
+                                        <span className="text-emerald-300 font-bold text-sm">¥{item.cost}</span>
+                                    ) : (
+                                        <span className="text-white/80 text-xs">免费</span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -240,7 +290,7 @@ export default function PlaceDetailDrawer({
                             </div>
                         </div>
                     )}
-                </div >
+                </div>
             </>
         );
     }
