@@ -104,7 +104,7 @@ export default function MobileBottomSheet({ children }: MobileBottomSheetProps) 
     return (
         <div
             className={`
-                fixed bottom-0 left-0 right-0 z-40
+                fixed bottom-0 left-0 right-0 z-50
                 bg-white rounded-t-[24px] shadow-2xl
                 flex flex-col
                 ${isDragging ? '' : 'transition-[height] duration-300 ease-out'}

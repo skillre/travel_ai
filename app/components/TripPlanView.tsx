@@ -184,26 +184,16 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         />
                     </div>
 
-                    {/* ===== 悬浮顶栏 (Floating Header) ===== */}
-                    <div className="absolute top-0 left-0 right-0 z-30 safe-area-top">
-                        <div className="mx-3 mt-3 px-3 py-2.5 bg-white/85 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50">
-                            {/* 第一行：返回 + 城市名称 + 统计 */}
-                            <div className="flex items-center gap-2 mb-2">
-                                {/* 返回首页按钮 */}
-                                <button
-                                    onClick={() => window.location.reload()}
-                                    className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-600 touch-feedback"
-                                >
-                                    <Home className="w-4 h-4" />
-                                </button>
-
-                                {/* 城市信息 */}
-                                <div className="flex-1 min-w-0">
-                                    <h1 className="font-bold text-slate-800 text-sm leading-tight truncate">{tripPlan.meta.city}</h1>
+                    {/* ===== 悬浮顶栏 (Floating Header) - 只显示城市信息和天数切换 ===== */}
+                    <div className="absolute top-0 left-0 right-0 z-30 safe-area-top pointer-events-none">
+                        <div className="mx-3 mt-3 px-3 py-2.5 bg-white/90 backdrop-blur-xl rounded-2xl shadow-lg border border-white/50 pointer-events-auto">
+                            {/* 城市名称 + 统计数据 */}
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base">📍</span>
+                                    <h1 className="font-bold text-slate-800 text-sm leading-tight">{tripPlan.meta.city}</h1>
                                 </div>
-
-                                {/* 统计数据 */}
-                                <div className="shrink-0 flex items-center gap-1 text-[10px] text-slate-500">
+                                <div className="flex items-center gap-1 text-[10px] text-slate-500">
                                     <span className="font-bold text-slate-700">{tripPlan.timeline.length}</span>天
                                     <span className="mx-0.5">·</span>
                                     <span className="font-bold text-teal-600">{totalSpots}</span>景点
@@ -212,7 +202,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                 </div>
                             </div>
 
-                            {/* 第二行：天数切换按钮 */}
+                            {/* 天数切换按钮 */}
                             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                                 <button
                                     onClick={() => handleSelectDay(null)}
@@ -228,7 +218,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                     <button
                                         key={day.day}
                                         onClick={() => handleSelectDay(index)}
-                                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
+                                        className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
                                             ? 'text-white shadow-sm'
                                             : 'bg-slate-100 text-slate-600'
                                             }`}
