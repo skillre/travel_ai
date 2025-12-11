@@ -11,6 +11,7 @@ interface TimelineViewProps {
     selectedDay?: number | null; // null = 显示全部天
     onItemHover?: (dayIndex: number, itemIndex: number) => void;
     onItemClick?: (dayIndex: number, itemIndex: number, item: TripPlanItem) => void;
+    isMobile?: boolean; // 移动端模式：紧凑布局
 }
 
 // 每天路线的颜色
@@ -29,6 +30,7 @@ export default function TimelineView({
     selectedDay = null,
     onItemHover,
     onItemClick,
+    isMobile = false,
 }: TimelineViewProps) {
 
     // 预加载所有景点图片
@@ -98,7 +100,7 @@ export default function TimelineView({
                             />
 
                             {/* 卡片列表 */}
-                            <div className="relative space-y-4 pl-1">
+                            <div className={`relative ${isMobile ? 'space-y-2' : 'space-y-4'} pl-1`}>
                                 {day.items.map((item, itemIndex) => (
                                     <ItineraryCard
                                         key={itemIndex}
@@ -108,6 +110,7 @@ export default function TimelineView({
                                         isFirst={itemIndex === 0}
                                         onHover={() => handleItemHover(originalDayIndex, itemIndex)}
                                         onClick={() => handleItemClick(originalDayIndex, itemIndex, item)}
+                                        isCompact={isMobile}
                                     />
                                 ))}
                             </div>

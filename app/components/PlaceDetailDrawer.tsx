@@ -11,6 +11,7 @@ interface PlaceDetailDrawerProps {
     onClose: () => void;
     item: TripPlanItem | null;
     city: string;
+    isMobile?: boolean; // 移动端模式：底部滑入全屏 modal
 }
 
 export default function PlaceDetailDrawer({
@@ -18,6 +19,7 @@ export default function PlaceDetailDrawer({
     onClose,
     item,
     city,
+    isMobile = false,
 }: PlaceDetailDrawerProps) {
     const isFood = item?.type === 'food';
     const [isVisible, setIsVisible] = useState(false);
@@ -45,6 +47,130 @@ export default function PlaceDetailDrawer({
     const durationMatch = item?.sub_title?.match(/(\d+[小时分钟]+)/);
     const duration = durationMatch ? durationMatch[1] : '建议游玩相关时长';
 
+    // 移动端：全屏底部滑入 modal
+    if (isMobile) {
+        return (
+            <>
+                {/* 背景遮罩 */}
+                <div
+                    className={`
+                        fixed inset-0 bg-black/50 z-[999] transition-opacity duration-300
+                        ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+                    `}
+                    onClick={onClose}
+                />
+                {/* Modal 内容 */}
+                <div
+                    className={`
+                        fixed inset-x-0 bottom-0 z-[1000] max-h-[90vh]
+                        bg-white rounded-t-3xl shadow-2xl
+                        transform transition-transform duration-300 ease-out
+                        flex flex-col overflow-hidden
+                        ${isOpen ? 'translate-y-0' : 'translate-y-full'}
+                    `}
+                >
+                    {/* Handle 拖拽提示 */}
+                    <div className="shrink-0 flex justify-center pt-3 pb-1" onClick={onClose}>
+                        <div className="w-10 h-1 bg-slate-300 rounded-full" />
+                    </div>
+
+                    {/* 顶部图片区域 - 移动端更紧凑 */}
+                    <div className="relative h-44 bg-slate-100 shrink-0 group">
+                        {imageUrl ? (
+                            <Image
+                                src={imageUrl}
+                                alt={item?.title || ''}
+                                fill
+                                className="object-cover"
+                                priority
+                            />
+                        ) : (
+                            <div className={`absolute inset-0 flex items-center justify-center text-4xl ${isFood ? 'bg-orange-50' : 'bg-teal-50'}`}>
+                                {item?.emoji}
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+                        {/* 关闭按钮 */}
+                        <button
+                            onClick={onClose}
+                            className="absolute top-3 right-3 p-2 bg-black/30 backdrop-blur-sm rounded-full text-white z-20"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        {/* 标题 */}
+                        <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                            <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold mb-2 ${isFood ? 'bg-orange-500 text-white' : 'bg-teal-500 text-white'}`}>
+                                {isFood ? '美食' : '景点'}
+                            </div>
+                            <h2 className="text-xl font-bold text-white leading-tight drop-shadow-md">
+                                {item?.title}
+                            </h2>
+                            <div className="flex items-center gap-2 mt-1.5 text-sm">
+                                <span className="bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded text-white text-xs">
+                                    {item?.time_label}
+                                </span>
+                                {item?.cost ? (
+                                    <span className="text-emerald-300 font-bold text-sm">¥{item.cost}</span>
+                                ) : (
+                                    <span className="text-white/80 text-xs">免费</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 内容滚动区域 */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[45vh]">
+                        {/* 标签 */}
+                        {item?.tags && item.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                                {item.tags.map((tag, i) => (
+                                    <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs rounded-full">
+                                        #{tag}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* 描述 */}
+                        <div>
+                            <p className="text-slate-600 text-sm leading-relaxed">{item?.content.desc}</p>
+                        </div>
+
+                        {/* 亮点 */}
+                        {item?.content.highlight_text && (
+                            <div className={`p-3 rounded-xl text-sm ${isFood ? 'bg-orange-50 text-orange-800' : 'bg-sky-50 text-sky-800'}`}>
+                                <span className="mr-1">{isFood ? '😋' : '💡'}</span>
+                                {item.content.highlight_text}
+                            </div>
+                        )}
+
+                        {/* 信息列表 */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                            {duration && (
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                    <Clock className="w-4 h-4 text-slate-400" />
+                                    <span>建议游玩: {duration}</span>
+                                </div>
+                            )}
+                            {item?.address && (
+                                <div className="flex items-start gap-2 text-sm text-slate-600">
+                                    <MapPin className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
+                                    <span>{item.address}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 底部安全区域 */}
+                    <div className="shrink-0 safe-area-bottom bg-white" />
+                </div>
+            </>
+        );
+    }
+
+    // 桌面端：右侧滑入抽屉
     return (
         <div
             className={`

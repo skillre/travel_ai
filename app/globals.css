@@ -221,3 +221,119 @@
     font-size: 14px;
   }
 }
+
+/* ========================================
+   移动端触控体验优化 - 原生 App 体验
+   ======================================== */
+
+/* 禁止长按弹出菜单和文本选择，提供原生 App 体验 */
+* {
+  -webkit-touch-callout: none;
+  /* 禁止长按弹出菜单 */
+  -webkit-tap-highlight-color: transparent;
+  /* 移除点击高亮 */
+}
+
+/* 禁止页面内容选择（保留输入框可选） */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  /* 启用平滑滚动 */
+  -webkit-overflow-scrolling: touch;
+  /* 固定背景防止橡皮筋效果 */
+  overscroll-behavior: none;
+}
+
+/* 允许输入框和文本区域选择文字 */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* 优化触控响应 - 移除 300ms 点击延迟 */
+a,
+button,
+[role="button"],
+input,
+label,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* 可点击元素的触控反馈 */
+.touch-feedback {
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.touch-feedback:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* 安全区域适配 - iPhone 刘海屏和底部横条 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+.safe-area-all {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 防止 iOS 滑动返回手势干扰 */
+.prevent-swipe-back {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+}
+
+/* 全屏容器适配安全区域 */
+.fullscreen-container {
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* 动态视口高度，适配移动端地址栏 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 底部固定元素适配安全区域 */
+.fixed-bottom-bar {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+}
+
+/* 优化移动端按钮大小（至少 44px 触控区域） */
+@media (max-width: 768px) {
+
+  button,
+  [role="button"],
+  .clickable {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* 隐藏滚动条工具类 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

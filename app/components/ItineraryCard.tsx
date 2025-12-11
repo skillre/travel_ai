@@ -14,6 +14,7 @@ interface ItineraryCardProps {
     isActive?: boolean;
     onHover?: () => void;
     onClick?: () => void;
+    isCompact?: boolean; // 移动端紧凑模式
 }
 
 /**
@@ -22,6 +23,7 @@ interface ItineraryCardProps {
  * - 固定宽高的左侧图片区域
  * - 右侧内容区域包含标题、元数据、标签、提示
  * - 图片加载失败时显示优雅的占位符
+ * - isCompact: 移动端紧凑模式 (60x60 缩略图 + 精简信息)
  */
 function ItineraryCardComponent({
     item,
@@ -31,6 +33,7 @@ function ItineraryCardComponent({
     isActive = false,
     onHover,
     onClick,
+    isCompact = false,
 }: ItineraryCardProps) {
     const isFood = item.type === 'food';
     const [imgError, setImgError] = useState(false);
@@ -51,6 +54,138 @@ function ItineraryCardComponent({
     const durationMatch = item.sub_title?.match(/(\d+[小时分钟]+)/);
     const duration = durationMatch ? durationMatch[1] : null;
 
+    // ===== 紧凑模式 (移动端) =====
+    if (isCompact) {
+        return (
+            <div
+                className={`
+                    group relative pl-8 cursor-pointer touch-feedback
+                    transition-all duration-200
+                    ${isActive ? 'scale-[1.01]' : ''}
+                `}
+                onClick={onClick}
+            >
+                {/* Timeline Dot - 紧凑版 */}
+                <div
+                    className={`
+                        absolute left-[9px] top-5 w-2.5 h-2.5 rounded-full z-10
+                        border-2 transition-all duration-200
+                        ${isActive
+                            ? 'bg-teal-500 border-teal-500 scale-125'
+                            : isFood
+                                ? 'bg-white border-orange-400'
+                                : 'bg-white border-teal-400'
+                        }
+                    `}
+                />
+
+                {/* 紧凑卡片布局 */}
+                <div
+                    className={`
+                        relative bg-white rounded-xl border overflow-hidden
+                        transition-all duration-200
+                        ${isActive
+                            ? 'border-teal-400 shadow-md'
+                            : isFood
+                                ? 'border-orange-100 active:border-orange-200 active:shadow-sm'
+                                : 'border-slate-100 active:border-slate-200 active:shadow-sm'
+                        }
+                    `}
+                >
+                    <div className="flex items-center gap-3 p-2.5">
+                        {/* 左侧缩略图 - 60x60 */}
+                        <div className="relative w-[60px] h-[60px] shrink-0 rounded-lg overflow-hidden bg-slate-100">
+                            {!imgError && imageUrl ? (
+                                <Image
+                                    src={imageUrl}
+                                    alt={item.title}
+                                    fill
+                                    className="object-cover"
+                                    sizes="60px"
+                                    onError={handleImageError}
+                                />
+                            ) : (
+                                <div className={`absolute inset-0 flex items-center justify-center ${isFood ? 'bg-orange-50' : 'bg-slate-50'}`}>
+                                    <span className="text-2xl">{item.emoji || (isFood ? '🍽️' : '🏞️')}</span>
+                                </div>
+                            )}
+
+                            {/* 图片加载中 */}
+                            {imgLoading && !imgError && (
+                                <div className="absolute inset-0 bg-slate-100 animate-pulse" />
+                            )}
+                        </div>
+
+                        {/* 右侧内容 - 精简版 */}
+                        <div className="flex-1 min-w-0 py-0.5">
+                            {/* 标题行 */}
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                                <h3
+                                    className={`
+                                        font-bold text-sm leading-snug line-clamp-1
+                                        ${isActive ? 'text-teal-600' : 'text-slate-800'}
+                                    `}
+                                >
+                                    {item.title}
+                                </h3>
+                                {item.cost > 0 && (
+                                    <span className="shrink-0 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                        ¥{item.cost}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* 时间 + 时长 */}
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1.5">
+                                <div className="flex items-center gap-0.5">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{item.time_label}</span>
+                                </div>
+                                {duration && (
+                                    <>
+                                        <span className="text-slate-300">•</span>
+                                        <span>{duration}</span>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* 核心标签 - 只显示前2个 */}
+                            {item.tags && item.tags.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                    {item.tags.slice(0, 2).map((tag, i) => (
+                                        <span
+                                            key={i}
+                                            className={`
+                                                text-[9px] px-1.5 py-0.5 rounded
+                                                ${isFood
+                                                    ? 'bg-orange-50 text-orange-600'
+                                                    : 'bg-slate-50 text-slate-500'
+                                                }
+                                            `}
+                                        >
+                                            {tag}
+                                        </span>
+                                    ))}
+                                    {item.tags.length > 2 && (
+                                        <span className="text-[9px] text-slate-400">+{item.tags.length - 2}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 右箭头指示 */}
+                        <div className="shrink-0 text-slate-300">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ===== 标准模式 (桌面端) =====
     return (
         <div
             className={`
