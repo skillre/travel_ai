@@ -194,7 +194,7 @@ export default function PlaceDetailDrawer({
                                 </div>
                                 <div className="flex flex-col gap-[1px] bg-slate-200/50">
                                     <a
-                                        href={`iosamap://navi?sourceApplication=webapp&lat=${item?.location?.lat}&lon=${item?.location?.lng}&name=${item?.title}&dev=0`}
+                                        href={`iosamap://viewMap?sourceApplication=webapp&poiname=${item?.title}&lat=${item?.location?.lat}&lon=${item?.location?.lng}&dev=0`}
                                         className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50"
                                         onClick={() => setTimeout(() => setShowMapSheet(false), 300)}
                                     >
