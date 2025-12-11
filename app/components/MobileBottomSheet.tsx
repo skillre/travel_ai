@@ -108,7 +108,7 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
         <div
             className={`
                 fixed z-50 bg-white shadow-2xl flex flex-col
-                transition-all duration-300 ease-in-out
+                ${isDragging ? 'transition-none' : 'transition-all duration-300 ease-in-out'}
                 ${isHidden
                     ? 'bottom-4 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full cursor-pointer hover:scale-105 active:scale-95'
                     : 'bottom-0 left-0 right-0 rounded-t-[24px]'
@@ -146,13 +146,13 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
                 {/* Handle */}
                 <div
                     ref={handleRef}
-                    className="shrink-0 flex flex-col items-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none"
+                    className="shrink-0 flex flex-col items-center pt-2 pb-0 cursor-grab active:cursor-grabbing touch-none"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                     onClick={handleHandleClick}
                 >
-                    <div className="w-8 h-1 bg-slate-300 rounded-full mb-1" />
+                    <div className="w-8 h-1 bg-slate-300 rounded-full" />
                 </div>
 
                 {/* Content */}
