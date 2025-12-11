@@ -110,12 +110,12 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
                 fixed z-50 bg-white shadow-2xl flex flex-col
                 transition-all duration-300 ease-in-out
                 ${isHidden
-                    ? 'bottom-6 left-1/2 -translate-x-1/2 w-40 h-12 rounded-full cursor-pointer hover:scale-105 active:scale-95'
+                    ? 'bottom-4 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full cursor-pointer hover:scale-105 active:scale-95'
                     : 'bottom-0 left-0 right-0 rounded-t-[24px]'
                 }
             `}
             style={{
-                height: isHidden ? '48px' : `${finalHeightVh}vh`,
+                height: isHidden ? '40px' : `${finalHeightVh}vh`,
                 boxShadow: isHidden
                     ? '0 4px 20px rgba(0,0,0,0.15)'
                     : '0 -8px 30px rgba(0, 0, 0, 0.12)',
@@ -146,13 +146,13 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
                 {/* Handle */}
                 <div
                     ref={handleRef}
-                    className="shrink-0 flex flex-col items-center py-3 cursor-grab active:cursor-grabbing touch-none"
+                    className="shrink-0 flex flex-col items-center pt-3 pb-1 cursor-grab active:cursor-grabbing touch-none"
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                     onClick={handleHandleClick}
                 >
-                    <div className="w-10 h-1.5 bg-slate-300 rounded-full mb-1" />
+                    <div className="w-8 h-1 bg-slate-300 rounded-full mb-1" />
                 </div>
 
                 {/* Content */}

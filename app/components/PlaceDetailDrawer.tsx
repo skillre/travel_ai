@@ -128,7 +128,7 @@ export default function PlaceDetailDrawer({
                     >
                         {/* Handle 拖拽提示 */}
                         <div className="flex justify-center pt-3 pb-1" onClick={onClose}>
-                            <div className="w-10 h-1 bg-slate-300 rounded-full" />
+                            <div className="w-8 h-1 bg-slate-300 rounded-full" />
                         </div>
 
                         {/* 顶部图片区域 - 移动端更紧凑 */}

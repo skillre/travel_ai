@@ -683,7 +683,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                 {/* 图例 - 调整位置到左下角并留出空间 */}
                 {timeline && timeline.length > 0 && !isLoading && !error && (
-                    <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md rounded-lg p-3 shadow-lg border border-slate-200 z-10 max-w-[200px]">
+                    <div className="absolute bottom-24 left-4 bg-white/95 backdrop-blur-md rounded-lg p-3 shadow-lg border border-slate-200 z-10 max-w-[200px]">
                         <p className="text-[11px] text-slate-500 font-semibold mb-1.5">图例</p>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="flex items-center gap-1">
