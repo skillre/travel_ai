@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { X, MapPin, Clock, Tag, Share2, Heart, ExternalLink } from 'lucide-react';
 import { TripPlanItem } from '../types';
