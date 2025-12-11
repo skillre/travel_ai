@@ -14,6 +14,16 @@ interface PlaceDetailDrawerProps {
     isMobile?: boolean; // 移动端模式：底部滑入全屏 modal
 }
 
+// GCJ-02 (高德/腾讯) 转 BD-09 (百度)
+function gcj02ToBd09(lng: number, lat: number) {
+    const x_pi = 3.14159265358979324 * 3000.0 / 180.0;
+    const z = Math.sqrt(lng * lng + lat * lat) + 0.00002 * Math.sin(lat * x_pi);
+    const theta = Math.atan2(lat, lng) + 0.000003 * Math.cos(lng * x_pi);
+    const bd_lng = z * Math.cos(theta) + 0.0065;
+    const bd_lat = z * Math.sin(theta) + 0.006;
+    return { lat: bd_lat, lng: bd_lng };
+}
+
 export default function PlaceDetailDrawer({
     isOpen,
     onClose,
@@ -194,15 +204,24 @@ export default function PlaceDetailDrawer({
                                 </div>
                                 <div className="flex flex-col gap-[1px] bg-slate-200/50">
                                     <a
-                                        href={`iosamap://viewMap?sourceApplication=webapp&poiname=${item?.title}&lat=${item?.location?.lat}&lon=${item?.location?.lng}&dev=0`}
-                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50"
+                                        href={`https://uri.amap.com/marker?position=${item?.location?.lng},${item?.location?.lat}&name=${item?.title}&callnative=1`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50 block"
                                         onClick={() => setTimeout(() => setShowMapSheet(false), 300)}
                                     >
                                         高德地图
                                     </a>
                                     <a
-                                        href={`baidumap://map/marker?location=${item?.location?.lat},${item?.location?.lng}&title=${item?.title}&content=${item?.title}&src=webapp`}
-                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50"
+                                        href={(function () {
+                                            const { lat, lng } = item?.location
+                                                ? gcj02ToBd09(item.location.lng, item.location.lat)
+                                                : { lat: 0, lng: 0 };
+                                            return `http://api.map.baidu.com/marker?location=${lat},${lng}&title=${item?.title}&content=${item?.title}&output=html&src=webapp`;
+                                        })()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full py-4 bg-white text-slate-800 font-medium text-base text-center active:bg-slate-50 block"
                                         onClick={() => setTimeout(() => setShowMapSheet(false), 300)}
                                     >
                                         百度地图
@@ -221,7 +240,7 @@ export default function PlaceDetailDrawer({
                             </div>
                         </div>
                     )}
-                </div>
+                </div >
             </>
         );
     }
