@@ -197,7 +197,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     />
 
                     {/* ===== 底部抽屉面板 (行程列表) ===== */}
-                    <MobileBottomSheet>
+                    <MobileBottomSheet title={tripPlan.meta.city}>
                         <TimelineView
                             timeline={tripPlan.timeline}
                             city={tripPlan.meta.city}
