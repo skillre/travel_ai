@@ -155,23 +155,26 @@ export default function PlaceDetailDrawer({
                                 </div>
                             )}
                             {item?.address && (
-                                <a
-                                    href={`https://uri.amap.com/marker?position=${item.location?.lng},${item.location?.lat}&name=${item.title}&callnative=1`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-start gap-2 text-sm text-slate-600 active:bg-slate-50 active:scale-[0.98] transition-all p-2 -mx-2 rounded-lg"
-                                >
-                                    <MapPin className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
-                                    <span className="flex-1">
-                                        {item.address}
-                                        <span className="inline-block ml-2 text-xs text-teal-600 font-medium bg-teal-50 px-1.5 py-0.5 rounded">
-                                            导航
-                                        </span>
-                                    </span>
-                                    <div className="shrink-0 text-slate-300">
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                    </div>
-                                </a>
+                                <div className="flex gap-2">
+                                    <a
+                                        href={`https://uri.amap.com/marker?position=${item.location?.lng},${item.location?.lat}&name=${item.title}&callnative=1`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-teal-700 bg-teal-50 active:bg-teal-100 active:scale-[0.98] transition-all py-2.5 rounded-xl border border-teal-100"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        高德地图
+                                    </a>
+                                    <a
+                                        href={`http://api.map.baidu.com/marker?location=${item.location?.lat},${item.location?.lng}&title=${item.title}&content=${item.address}&output=html&src=webapp.baidu.openAPIdemo`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 active:bg-blue-100 active:scale-[0.98] transition-all py-2.5 rounded-xl border border-blue-100"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5" />
+                                        百度地图
+                                    </a>
+                                </div>
                             )}
                         </div>
                     </div>

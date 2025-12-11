@@ -2,11 +2,12 @@
 
 import { useRef, useState, useCallback, ReactNode, useEffect } from 'react';
 
-// 抽屉状态 - 简化为两个状态
-type SheetState = 'collapsed' | 'expanded';
+// 抽屉状态 - 三种状态
+type SheetState = 'minimized' | 'collapsed' | 'expanded';
 
 // 高度配置 (vh)
 const SHEET_HEIGHTS: Record<SheetState, number> = {
+    minimized: 12,  // 最小化 - 露出地图
     collapsed: 40,  // 约 40% - 显示一些卡片预览
     expanded: 88,   // 约 88% - 展开显示更多内容
 };
@@ -71,14 +72,21 @@ export default function MobileBottomSheet({ children }: MobileBottomSheetProps) 
 
         // 根据拖拽距离决定目标状态
         if (sheetState === 'collapsed') {
-            // 当前是折叠状态，向上拖超过阈值则展开
+            // 当前是折叠状态
             if (translateY < -DRAG_THRESHOLD) {
-                setSheetState('expanded');
+                setSheetState('expanded'); // 向上 -> 展开
+            } else if (translateY > DRAG_THRESHOLD) {
+                setSheetState('minimized'); // 向下 -> 最小化
+            }
+        } else if (sheetState === 'expanded') {
+            // 当前是展开状态
+            if (translateY > DRAG_THRESHOLD) {
+                setSheetState('collapsed'); // 向下 -> 折叠
             }
         } else {
-            // 当前是展开状态，向下拖超过阈值则折叠
-            if (translateY > DRAG_THRESHOLD) {
-                setSheetState('collapsed');
+            // 当前是最小化状态
+            if (translateY < -DRAG_THRESHOLD) {
+                setSheetState('collapsed'); // 向上 -> 折叠
             }
         }
 
@@ -88,7 +96,11 @@ export default function MobileBottomSheet({ children }: MobileBottomSheetProps) 
 
     // Handle 点击切换
     const handleHandleClick = useCallback(() => {
-        setSheetState(prev => prev === 'collapsed' ? 'expanded' : 'collapsed');
+        setSheetState(prev => {
+            if (prev === 'minimized') return 'collapsed';
+            if (prev === 'collapsed') return 'expanded';
+            return 'collapsed';
+        });
     }, []);
 
     // 计算实际高度

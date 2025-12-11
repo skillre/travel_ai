@@ -28,9 +28,9 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
         <header className="sticky top-0 z-50 glass/80 backdrop-blur-md border-b border-white/40 shadow-sm animate-fade-in-up">
             <div className="max-w-7xl mx-auto px-4 py-3">
                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* Logo - Fresh Style */}
+                    {/* Logo - Fresh Style (Desktop) */}
                     <div
-                        className="flex items-center gap-3 shrink-0 cursor-pointer group"
+                        className="hidden sm:flex items-center gap-3 shrink-0 cursor-pointer group"
                         onClick={() => window.location.reload()}
                     >
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-tender-blue-400 to-fresh-green-400 flex items-center justify-center shadow-lg shadow-tender-blue-500/20 group-hover:shadow-tender-blue-500/30 transition-all duration-300 group-hover:scale-105 text-white">
@@ -48,6 +48,13 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
 
                     {/* Search Bar - Light/Clean */}
                     <div className="flex-1 flex gap-3 w-full sm:w-auto sm:ml-8">
+                        {/* Mobile Home Button */}
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="sm:hidden px-3 py-2.5 bg-white/60 border border-slate-200/60 rounded-xl text-slate-600 flex items-center justify-center shadow-sm"
+                        >
+                            <span className="text-lg">✈️</span>
+                        </button>
                         <div className="relative flex-1 group">
                             <input
                                 type="text"

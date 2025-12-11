@@ -51,6 +51,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const [selectedDay, setSelectedDay] = useState<number | null>(null); // null = 全部天
     const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
     const [bgLoading, setBgLoading] = useState(true);
+    const [isBannerExpanded, setIsBannerExpanded] = useState(true);
 
     // 详情抽屉状态
     const [selectedDetailItem, setSelectedDetailItem] = useState<TripPlanItem | null>(null);
@@ -203,30 +204,40 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                             </div>
 
                             {/* 天数切换按钮 */}
-                            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-                                <button
-                                    onClick={() => handleSelectDay(null)}
-                                    className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === null
-                                        ? 'bg-slate-800 text-white shadow-sm'
-                                        : 'bg-slate-100 text-slate-600'
-                                        }`}
-                                >
-                                    <Layers className="w-3 h-3" />
-                                    全部
-                                </button>
-                                {tripPlan.timeline.map((day, index) => (
+                            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isBannerExpanded ? 'max-h-20 opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'}`}>
+                                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1">
                                     <button
-                                        key={day.day}
-                                        onClick={() => handleSelectDay(index)}
-                                        className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
-                                            ? 'text-white shadow-sm'
+                                        onClick={() => handleSelectDay(null)}
+                                        className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === null
+                                            ? 'bg-slate-800 text-white shadow-sm'
                                             : 'bg-slate-100 text-slate-600'
                                             }`}
-                                        style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
                                     >
-                                        D{day.day}
+                                        <Layers className="w-3 h-3" />
+                                        全部
                                     </button>
-                                ))}
+                                    {tripPlan.timeline.map((day, index) => (
+                                        <button
+                                            key={day.day}
+                                            onClick={() => handleSelectDay(index)}
+                                            className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
+                                                ? 'text-white shadow-sm'
+                                                : 'bg-slate-100 text-slate-600'
+                                                }`}
+                                            style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
+                                        >
+                                            D{day.day}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 折叠切换按钮 (底部小条) */}
+                            <div className="flex justify-center -mb-1 mt-1">
+                                <button
+                                    onClick={() => setIsBannerExpanded(!isBannerExpanded)}
+                                    className="w-8 h-1 bg-slate-200 rounded-full active:bg-slate-300 transition-colors"
+                                />
                             </div>
                         </div>
                     </div>
