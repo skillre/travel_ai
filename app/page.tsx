@@ -229,7 +229,7 @@ export default function Home() {
                 <UnlockModal
                     shouldLock={!isUnlocked}
                     onUnlocked={() => setIsUnlocked(true)}
-                    wechatName="你的公众号名称"
+                    wechatName="skillre"
                     qrCodeUrl="/qrcode.png"
                 />
             )}

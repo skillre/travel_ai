@@ -62,10 +62,10 @@ export async function POST(request: NextRequest) {
 
         // 获取环境变量
         const notionToken = process.env.NOTION_TOKEN || process.env.NOTION_API_KEY;
-        const databaseId = process.env.NOTION_DATABASE_ID;
+        const databaseId = process.env.NOTION_UNLOCK_DATABASE_ID;
 
         if (!notionToken || !databaseId) {
-            console.error('Missing NOTION_TOKEN or NOTION_DATABASE_ID');
+            console.error('Missing NOTION_TOKEN or NOTION_UNLOCK_DATABASE_ID');
             return NextResponse.json(
                 { valid: false, msg: '服务配置错误' } as VerifyResponse,
                 { status: 500 }
