@@ -51,7 +51,12 @@ export default function Home() {
 
         setIsLoading(true);
         setError(null);
-        setProgressState({ progress: 0, message: '准备中...', step: 'connecting' });
+        // 初始化状态
+        setProgressState({
+            progress: 0,
+            message: 'AI 正在启动...',
+            step: 'connecting' // 这里的 step 只是为了兼容接口，实际展示主要靠 message
+        });
 
         try {
             const response = await fetch('/api/generate-plan', {
@@ -78,37 +83,77 @@ export default function Home() {
                 const { done, value } = await reader.read();
                 if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
 
-                // 处理 SSE 数据
-                const lines = buffer.split('\n\n');
+                // 处理新的协议 (PROGRESS:..., DONE:..., HEARTBEAT)
+                const lines = buffer.split('\n');
+                // 保留最后一个可能不完整的行 (如果没有换行符，全保留)
+                // 注意：如果最后一行是完整的且以\n结尾，split会产生一个空串在最后，buffer变成空串，这是对的。
+                // 如果最后一行不完整，它会留在buffer里。
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const event = JSON.parse(line.slice(6));
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) continue;
 
-                            if (event.type === 'progress') {
-                                setProgressState({
-                                    progress: event.progress,
-                                    message: event.message,
-                                    step: event.step
-                                });
-                            } else if (event.type === 'complete') {
-                                setTripData(event.data);
-                                setWorkflowRunId(event.workflow_run_id || null);
-                                setProgressState({
-                                    progress: 100,
-                                    message: '完成！',
-                                    step: 'finalizing'
-                                });
-                            } else if (event.type === 'error') {
-                                throw new Error(event.error);
+                    if (trimmedLine.startsWith('PROGRESS:')) {
+                        const message = trimmedLine.slice(9);
+
+                        // 收到新的文本，更新 loadingText，并根据新消息触发一个小进度跳跃
+                        setProgressState(prev => {
+                            const currentProgress = prev.progress;
+                            // 每次文案变更，进度前进一点，最大90%（留给DONE）
+                            // 简单的逻辑：步进 5-10%
+                            let nextProgress = currentProgress + Math.random() * 5 + 2;
+                            if (nextProgress > 90) nextProgress = 90;
+
+                            return {
+                                progress: nextProgress,
+                                message: message,
+                                step: 'processing'
+                            };
+                        });
+
+                    } else if (trimmedLine.startsWith('DONE:')) {
+                        const id = trimmedLine.slice(5);
+                        setWorkflowRunId(id);
+
+                        setProgressState(prev => ({
+                            ...prev,
+                            progress: 100,
+                            message: '生成完成！正在加载行程...',
+                            step: 'finalizing'
+                        }));
+
+                        // 使用 ID 获取完整行程数据
+                        try {
+                            const historyRes = await fetch(`/api/history/${id}`, {
+                                cache: 'no-store'
+                            });
+
+                            if (!historyRes.ok) {
+                                throw new Error('获取行程详情失败');
                             }
-                        } catch (parseError) {
-                            // 忽略解析错误，继续处理
+
+                            const historyResult = await historyRes.json();
+                            setTripData(historyResult.data);
+                        } catch (fetchErr) {
+                            console.error(fetchErr);
+                            // 如果获取失败，可能是 ID 不是 Notion Page ID 或者稍微有些延迟
+                            // 这里可以重试，或者报错。暂时报错。
+                            throw new Error('获取最终行程失败，请前往历史记录查看');
                         }
+
+                    } else if (trimmedLine === 'HEARTBEAT') {
+                        // 心跳不更新文案，只轻微推动进度条
+                        setProgressState(prev => ({
+                            ...prev,
+                            progress: Math.min(prev.progress + 0.2, 95),
+                            // 保持现有 message 不变
+                            message: prev.message,
+                            step: prev.step
+                        }));
                     }
                 }
             }
@@ -190,8 +235,7 @@ export default function Home() {
             <GeneratingOverlay
                 isVisible={isLoading}
                 progress={progressState.progress}
-                message={progressState.message}
-                step={progressState.step}
+                loadingText={progressState.message}
             />
 
             {/* 全局 Loading 遮罩 for history */}
