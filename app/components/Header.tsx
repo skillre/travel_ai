@@ -31,10 +31,7 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
             <div className="max-w-7xl mx-auto px-4 py-2">
                 <div className="flex items-center gap-3 w-full">
                     {/* Search Bar - Auto Expand */}
-                    <div className={`
-                        transition-all duration-300 ease-in-out
-                        ${isFocused ? 'flex-1' : 'flex-[2]'}
-                    `}>
+                    <div className="flex-1 transition-all duration-300 ease-in-out">
                         <div className="relative group w-full">
                             <input
                                 type="text"
@@ -57,19 +54,20 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
                         </div>
                     </div>
 
-                    {/* Action Buttons - Hide on Focus */}
+                    {/* Regenerate Button - Always Visible */}
+                    <button
+                        onClick={handleGenerate}
+                        disabled={isLoading}
+                        className="bg-gradient-to-r from-tender-blue-500 to-fresh-green-500 text-white rounded-xl shadow-lg shadow-tender-blue-500/20 px-4 py-2.5 text-sm font-medium hover:scale-[1.02] active:scale-95 transition-all whitespace-nowrap"
+                    >
+                        重新生成
+                    </button>
+
+                    {/* Navigation Buttons - Hide on Focus */}
                     <div className={`
                         flex items-center gap-2 overflow-hidden transition-all duration-300
                         ${isFocused ? 'w-0 opacity-0' : 'w-auto opacity-100'}
                     `}>
-                        <button
-                            onClick={handleGenerate}
-                            disabled={isLoading}
-                            className="bg-gradient-to-r from-tender-blue-500 to-fresh-green-500 text-white rounded-xl shadow-lg shadow-tender-blue-500/20 px-4 py-2.5 text-sm font-medium hover:scale-[1.02] active:scale-95 transition-all whitespace-nowrap"
-                        >
-                            重新生成
-                        </button>
-
                         <div className="w-px h-8 bg-slate-200 mx-1" />
 
                         <button

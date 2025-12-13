@@ -230,10 +230,10 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                 : 'w-0 -translate-x-full'}
                         `}
                     >
-                        {/* Header */}
-                        <div className="shrink-0 relative overflow-hidden">
-                            {/* 背景图 */}
-                            <div className="relative h-40 md:h-48 w-full">
+                        {/* 内容区域 (包含 Header 和 Timeline，以支持整体滚动) */}
+                        <div className="flex-1 overflow-y-auto relative scroll-smooth">
+                            {/* Header Canvas (Image & Title) */}
+                            <div className="relative h-40 md:h-48 w-full shrink-0">
                                 {backgroundImage ? (
                                     <Image
                                         src={backgroundImage}
@@ -284,8 +284,8 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                 </div>
                             </div>
 
-                            {/* 天数切换按钮组 */}
-                            <div className="flex items-center gap-2 p-3 bg-slate-50 border-b border-slate-100 overflow-x-auto">
+                            {/* 天数切换按钮组 - Sticky Top */}
+                            <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-sm flex items-center gap-2 p-3 border-b border-slate-100 overflow-x-auto no-scrollbar">
                                 <button
                                     onClick={() => handleSelectDay(null)}
                                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedDay === null
@@ -325,10 +325,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                     </span>
                                 )}
                             </div>
-                        </div>
 
-                        {/* 内容区域 */}
-                        <div className="flex-1 overflow-y-auto">
                             <TimelineView
                                 timeline={tripPlan.timeline}
                                 city={tripPlan.meta.city}
