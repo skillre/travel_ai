@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  travel-ai:
+    container_name: travel-ai
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 3000:3000
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
