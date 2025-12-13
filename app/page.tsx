@@ -6,6 +6,7 @@ import HeroSection from './components/HeroSection';
 import Header from './components/Header';
 import TripResults from './components/TripResults';
 import GeneratingOverlay from './components/GeneratingOverlay';
+import UnlockModal from './components/UnlockModal';
 import { TripData } from './types';
 
 // 动态导入历史记录面板
@@ -32,6 +33,7 @@ export default function Home() {
     const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [isUnlocked, setIsUnlocked] = useState(false);
 
     // 进度状态
     const [progressState, setProgressState] = useState<ProgressState>({
@@ -168,7 +170,7 @@ export default function Home() {
                             isLoading={isLoading}
                             initialQuery={query}
                         />
-                        <div className="flex-1 relative overflow-hidden">
+                        <div className={`flex-1 relative overflow-hidden transition-all duration-500 ${!isUnlocked ? 'blur-md pointer-events-none select-none' : ''}`}>
                             <TripResults tripData={tripData} />
                         </div>
                     </>
@@ -221,6 +223,16 @@ export default function Home() {
                 onClose={() => setIsHistoryOpen(false)}
                 onSelectRecord={handleSelectHistory}
             />
+
+            {/* 解锁验证弹窗 - 仅在有行程数据且未解锁时显示 */}
+            {tripData && (
+                <UnlockModal
+                    shouldLock={!isUnlocked}
+                    onUnlocked={() => setIsUnlocked(true)}
+                    wechatName="你的公众号名称"
+                    qrCodeUrl="/qrcode.png"
+                />
+            )}
         </main>
     );
 }
