@@ -151,7 +151,9 @@ export async function GET(
             );
         }
 
-        // 获取 Notion 页面
+        let page: NotionPage;
+
+        // 尝试直接获取 Notion 页面 (假设 id 是 page_id)
         const response = await fetch(
             `https://api.notion.com/v1/pages/${pageId}`,
             {
@@ -160,20 +162,75 @@ export async function GET(
                     'Authorization': `Bearer ${notionKey}`,
                     'Notion-Version': '2022-06-28',
                 },
-                cache: 'no-store', // 禁用 Next.js 服务端缓存
+                cache: 'no-store',
             }
         );
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Notion API error:', response.status, errorText);
-            return NextResponse.json(
-                { error: '获取记录详情失败' },
-                { status: response.status }
-            );
-        }
+        if (response.ok) {
+            page = await response.json();
+        } else {
+            // 如果直接获取失败 (404 或 400)，尝试将其作为 workflow_run_id 查询数据库
+            if (response.status === 404 || response.status === 400) {
+                const databaseId = process.env.NOTION_DATABASE_ID;
+                if (!databaseId) {
+                    console.error('Missing NOTION_DATABASE_ID for fallback lookup');
+                    return NextResponse.json(
+                        { error: '记录不存在且未配置数据库 ID' },
+                        { status: 404 }
+                    );
+                }
 
-        const page: NotionPage = await response.json();
+                console.log(`Page lookup failed, trying to query by workflow_run_id: ${pageId}`);
+
+                const queryResponse = await fetch(
+                    `https://api.notion.com/v1/databases/${databaseId}/query`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${notionKey}`,
+                            'Content-Type': 'application/json',
+                            'Notion-Version': '2022-06-28',
+                        },
+                        body: JSON.stringify({
+                            filter: {
+                                property: 'workflow_run_id',
+                                rich_text: {
+                                    equals: pageId
+                                }
+                            }
+                        }),
+                        cache: 'no-store',
+                    }
+                );
+
+                if (!queryResponse.ok) {
+                    const errText = await queryResponse.text();
+                    console.error('Fallback query error:', queryResponse.status, errText);
+                    return NextResponse.json(
+                        { error: '无法找到该行程记录' },
+                        { status: 404 }
+                    );
+                }
+
+                const queryData = await queryResponse.json();
+                if (!queryData.results || queryData.results.length === 0) {
+                    return NextResponse.json(
+                        { error: '未找到匹配的行程记录' },
+                        { status: 404 }
+                    );
+                }
+
+                page = queryData.results[0];
+            } else {
+                // 其他错误直接返回
+                const errorText = await response.text();
+                console.error('Notion API error:', response.status, errorText);
+                return NextResponse.json(
+                    { error: '获取记录详情失败' },
+                    { status: response.status }
+                );
+            }
+        }
 
         // 解析 PlanJSON 字段
         const planJsonProp = page.properties.PlanJSON;
