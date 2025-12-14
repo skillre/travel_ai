@@ -1,9 +1,13 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { TripPlanDay, TripPlanItem } from '../types';
 import { ItineraryCard } from './ItineraryCard';
 import { preloadImages } from '../hooks/useUnsplashImage';
+
+export interface TimelineViewRef {
+    scrollToItem: (dayIndex: number, itemIndex: number) => void;
+}
 
 interface TimelineViewProps {
     timeline: TripPlanDay[];
@@ -24,14 +28,14 @@ const dayColors = [
  * 垂直时光轴组件
  * 支持按天筛选显示
  */
-export default function TimelineView({
+const TimelineView = forwardRef<TimelineViewRef, TimelineViewProps>(({
     timeline,
     city,
     selectedDay = null,
     onItemHover,
     onItemClick,
     isMobile = false,
-}: TimelineViewProps) {
+}, ref) => {
 
     // 预加载所有景点图片
     useEffect(() => {
@@ -40,6 +44,31 @@ export default function TimelineView({
         );
         preloadImages(allItems, city);
     }, [timeline, city]);
+
+    // 暴露给父组件的方法
+    useImperativeHandle(ref, () => ({
+        scrollToItem: (dayIndex: number, itemIndex: number) => {
+            // 找到对应的 DOM 元素
+            // 格式: item-{dayIndex}-{itemIndex}
+            const elementId = `item-${dayIndex}-${itemIndex}`;
+            const element = document.getElementById(elementId);
+
+            if (element) {
+                element.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+
+                // 添加高亮动画效果
+                element.classList.add('ring-2', 'ring-teal-500', 'bg-teal-50/50');
+                setTimeout(() => {
+                    element.classList.remove('ring-2', 'ring-teal-500', 'bg-teal-50/50');
+                }, 2000);
+            } else {
+                console.warn(`[TimelineView] Element not found: ${elementId}`);
+            }
+        }
+    }));
 
     const handleItemHover = useCallback((dayIndex: number, itemIndex: number) => {
         onItemHover?.(dayIndex, itemIndex);
@@ -102,16 +131,21 @@ export default function TimelineView({
                             {/* 卡片列表 */}
                             <div className={`relative ${isMobile ? 'space-y-2' : 'space-y-4'} pl-1`}>
                                 {day.items.map((item, itemIndex) => (
-                                    <ItineraryCard
+                                    <div
                                         key={itemIndex}
-                                        item={item}
-                                        city={city}
-                                        dayColor={dayColor}
-                                        isFirst={itemIndex === 0}
-                                        onHover={() => handleItemHover(originalDayIndex, itemIndex)}
-                                        onClick={() => handleItemClick(originalDayIndex, itemIndex, item)}
-                                        isCompact={isMobile}
-                                    />
+                                        id={`item-${originalDayIndex}-${itemIndex}`}
+                                        className="transition-all duration-300 rounded-xl"
+                                    >
+                                        <ItineraryCard
+                                            item={item}
+                                            city={city}
+                                            dayColor={dayColor}
+                                            isFirst={itemIndex === 0}
+                                            onHover={() => handleItemHover(originalDayIndex, itemIndex)}
+                                            onClick={() => handleItemClick(originalDayIndex, itemIndex, item)}
+                                            isCompact={isMobile}
+                                        />
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -128,4 +162,8 @@ export default function TimelineView({
             </div>
         </div>
     );
-}
+});
+
+TimelineView.displayName = 'TimelineView';
+
+export default TimelineView;

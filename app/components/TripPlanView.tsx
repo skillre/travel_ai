@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight, Coins, Lightbulb, Map, Calendar, Layers, Home } from 'lucide-react';
 import Image from 'next/image';
 import { TripPlan, TripPlanItem } from '../types';
-import TimelineView from './TimelineView';
+import TimelineView, { TimelineViewRef } from './TimelineView';
 import PlaceDetailDrawer from './PlaceDetailDrawer';
 import MobileBottomSheet from './MobileBottomSheet';
 import DayOverviewBanner from './DayOverviewBanner';
@@ -47,6 +47,7 @@ const dayColors = [
 
 export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     const mapRef = useRef<MapContainerNewRef>(null);
+    const timelineRef = useRef<TimelineViewRef>(null); // Ref for scrolling itinerary
     const [mapMethods, setMapMethods] = useState<MapContainerNewRef | null>(null); // 使用 state 存储地图方法
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [selectedDay, setSelectedDay] = useState<number | null>(null); // null = 全部天
@@ -124,6 +125,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
         }
     }, [mapMethods, isMobile]);
 
+
     // 处理地图 Marker 点击
     const handleMarkerClick = useCallback((dayIndex: number, itemIndex: number) => {
         const item = tripPlan.timeline[dayIndex]?.items[itemIndex];
@@ -131,6 +133,9 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
             setSelectedDetailItem(item);
             setIsDetailOpen(true);
             mapMethods?.setActiveMarker(dayIndex, itemIndex);
+
+            // 滚动到对应行程卡片
+            timelineRef.current?.scrollToItem(dayIndex, itemIndex);
         }
     }, [tripPlan.timeline, mapMethods]);
 
@@ -199,6 +204,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     {/* ===== 底部抽屉面板 (行程列表) ===== */}
                     <MobileBottomSheet title={tripPlan.meta.city}>
                         <TimelineView
+                            ref={timelineRef}
                             timeline={tripPlan.timeline}
                             city={tripPlan.meta.city}
                             selectedDay={selectedDay}
@@ -327,6 +333,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                             </div>
 
                             <TimelineView
+                                ref={timelineRef}
                                 timeline={tripPlan.timeline}
                                 city={tripPlan.meta.city}
                                 selectedDay={selectedDay}
