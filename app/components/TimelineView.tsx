@@ -99,7 +99,7 @@ const TimelineView = forwardRef<TimelineViewRef, TimelineViewProps>(({
                             style={{ animationDelay: `${filteredIndex * 100}ms` }}
                         >
                             {/* Day Header - 简洁设计 (Sticky) */}
-                            <div className="sticky top-[54px] z-30 bg-slate-100/95 backdrop-blur-sm -mx-4 md:-mx-6 px-4 md:px-6 py-3 flex items-center gap-3 mb-4 transition-all duration-300 border-b border-transparent data-[stuck=true]:border-slate-200 data-[stuck=true]:shadow-sm">
+                            <div className={`sticky ${isMobile ? 'top-0' : 'top-[54px]'} z-30 bg-slate-100/95 backdrop-blur-sm -mx-4 md:-mx-6 px-4 md:px-6 py-3 flex items-center gap-3 mb-4 transition-all duration-300 border-b border-transparent data-[stuck=true]:border-slate-200 data-[stuck=true]:shadow-sm`}>
                                 {/* 天数徽章 */}
                                 <div
                                     className="flex items-center justify-center w-12 h-12 rounded-xl text-white font-bold shadow-md"
