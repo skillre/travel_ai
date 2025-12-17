@@ -29,8 +29,8 @@ export function useUnsplashImage(
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchImage = useCallback(async (searchKeyword: string, searchCity: string) => {
-        const cacheKey = `${searchKeyword}-${searchCity}`;
+    const fetchImage = useCallback(async (searchKeyword: string, searchCity: string, searchType: 'spot' | 'food') => {
+        const cacheKey = `${searchKeyword}-${searchCity}-${searchType}`;
 
         // 检查缓存
         if (imageCache.has(cacheKey)) {
@@ -45,8 +45,10 @@ export function useUnsplashImage(
         // 创建加载 Promise
         const loadPromise = (async () => {
             try {
+                // 根据类型添加不同的搜索关键词，提高搜索精度
+                const typeHint = searchType === 'food' ? 'restaurant cuisine food' : 'scenery landmark';
                 const response = await fetch(
-                    `/api/image?query=${encodeURIComponent(searchKeyword + ' ' + searchCity)}`
+                    `/api/image?query=${encodeURIComponent(searchKeyword + ' ' + searchCity + ' ' + typeHint)}`
                 );
                 const result = await response.json();
 
@@ -68,14 +70,14 @@ export function useUnsplashImage(
     }, []);
 
     useEffect(() => {
-        // 只对 spot 类型获取图片
-        if (type !== 'spot' || !keyword) {
+        // 如果没有关键词则不获取
+        if (!keyword) {
             setImageUrl(null);
             setIsLoading(false);
             return;
         }
 
-        const cacheKey = `${keyword}-${city}`;
+        const cacheKey = `${keyword}-${city}-${type}`;
 
         // 检查缓存
         if (imageCache.has(cacheKey)) {
@@ -88,7 +90,7 @@ export function useUnsplashImage(
         setIsLoading(true);
         setError(null);
 
-        fetchImage(keyword, city)
+        fetchImage(keyword, city, type)
             .then((url) => {
                 setImageUrl(url);
                 setIsLoading(false);
