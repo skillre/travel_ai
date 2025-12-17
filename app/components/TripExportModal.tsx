@@ -113,30 +113,33 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                     </button>
                 </div>
 
-                {/* Content Area */}
-                <div className="flex-1 bg-slate-100 overflow-auto relative p-4 md:p-8 flex justify-center">
+                {/* Content Area - Fixed Scrolling */}
+                <div className="flex-1 bg-slate-100 overflow-auto relative p-4 md:p-8">
                     {generatedImage ? (
-                        <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                            <div className="bg-white p-2 rounded-xl shadow-lg border border-slate-200">
+                        <div className="flex flex-col items-center animate-in zoom-in duration-300 min-h-full justify-center">
+                            <div className="bg-white p-2 rounded-xl shadow-lg border border-slate-200 max-w-full">
                                 <img
                                     src={generatedImage}
                                     alt="Generated Trip Plan"
                                     className="max-h-[65vh] w-auto rounded-lg object-contain"
                                 />
                             </div>
-                            <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-medium animate-pulse">
+                            <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-medium animate-pulse shrink-0">
                                 <ImageIcon className="w-4 h-4" />
                                 <span>如果未自动下载，请长按图片保存到相册</span>
                             </div>
                         </div>
                     ) : (
-                        <div className="min-w-fit mx-auto shadow-xl bg-slate-50 rounded-xl overflow-hidden">
-                            {/* Original DOM for Preview & Capture */}
-                            <div ref={exportRef} className="bg-slate-50">
-                                <TripCheatsheetView
-                                    tripPlan={tripPlan}
-                                    id="trip-cheatsheet-export"
-                                />
+                        // Wrapper to ensure scroll is possible in all directions
+                        <div className="inline-block min-w-full min-h-full">
+                            <div className="shadow-xl bg-slate-50 rounded-xl overflow-hidden w-fit mx-auto">
+                                {/* Original DOM for Preview & Capture */}
+                                <div ref={exportRef} className="bg-slate-50">
+                                    <TripCheatsheetView
+                                        tripPlan={tripPlan}
+                                        id="trip-cheatsheet-export"
+                                    />
+                                </div>
                             </div>
                         </div>
                     )}

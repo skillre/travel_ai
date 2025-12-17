@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { MapPin, Clock, Camera, Wallet, Utensils } from 'lucide-react';
+import { MapPin, Clock, Camera, Wallet, Utensils, Loader2 } from 'lucide-react';
 import { TripPlan, TripPlanItem } from '../types';
 
 interface TripCheatsheetViewProps {
@@ -10,6 +10,66 @@ interface TripCheatsheetViewProps {
     className?: string;
     id?: string; // ID for html2canvas
 }
+
+// Helper component for loading images
+const SpotImage = ({ title, city, type }: { title: string, city: string, type: 'spot' | 'food' }) => {
+    const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchImage = async () => {
+            // Avoid fetching if we already have a url or if title is empty
+            if (!title) return;
+
+            try {
+                // Use the existing API
+                const query = `${city} ${title} ${type === 'food' ? 'food' : 'scenery'}`;
+                const res = await fetch(`/api/image?query=${encodeURIComponent(query)}`);
+                const data = await res.json();
+
+                if (isMounted && data.success && data.imageUrl) {
+                    setImageUrl(data.imageUrl);
+                }
+            } catch (err) {
+                console.error('Failed to load image for', title, err);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        fetchImage();
+        return () => { isMounted = false; };
+    }, [title, city, type]);
+
+    if (loading) {
+        return (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-slate-300">
+                <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+        );
+    }
+
+    if (imageUrl) {
+        return (
+            // Use standard img tag for html2canvas compatibility (Next.js Image can be tricky with external domains + canvas)
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={imageUrl}
+                alt={title}
+                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
+                crossOrigin="anonymous" // CRITICAL for html2canvas
+            />
+        );
+    }
+
+    // Fallback
+    return (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-slate-300">
+            {type === 'food' ? <Utensils size={32} /> : <Camera size={32} />}
+        </div>
+    );
+};
 
 const dayColors = [
     'border-red-500', 'border-orange-500', 'border-yellow-500', 'border-green-500',
@@ -33,11 +93,6 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
             id={id}
             className={`flex flex-row gap-8 p-12 bg-slate-50 min-w-max items-stretch ${className}`}
         >
-            {/* Header / Meta Column (Optional, or just put title at top of image?) 
-                Let's put a Title Header at the start if needed, or just let days flow.
-                Design Ref suggests: "Main Container... flex flex-row".
-             */}
-
             {tripPlan.timeline.map((day, index) => {
                 const colorClass = dayColors[index % dayColors.length];
                 const textClass = dayTextColors[index % dayTextColors.length];
@@ -59,19 +114,22 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                         <div className="flex items-center justify-between px-2 py-4">
                             <div className="w-full flex items-center justify-between relative">
                                 {/* Connecting Line */}
-                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-300 -z-10 border-t border-dashed border-slate-300"></div>
+                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-300 -z-10 border-t-2 border-dashed border-slate-300"></div>
 
                                 {/* Nodes (Take first 3 spots for brevity) */}
                                 {day.items.filter(i => i.type === 'spot').slice(0, 3).map((item, idx) => (
-                                    <div key={idx} className="flex flex-col items-center gap-1 bg-slate-50 px-1">
-                                        <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${bgClass.replace('bg-', 'bg-').replace('50', '500')}`}></div>
-                                        <span className="text-[10px] text-slate-500 font-medium max-w-[60px] truncate">{item.title}</span>
+                                    <div key={idx} className="flex flex-col items-center gap-1.5 bg-slate-50 px-1 z-10">
+                                        <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-md ${bgClass.replace('bg-', 'bg-').replace('50', '500')}`}></div>
+                                        {/* Improved Text Visibility */}
+                                        <span className="text-xs text-slate-700 font-bold max-w-[80px] truncate text-center leading-tight drop-shadow-sm">
+                                            {item.title}
+                                        </span>
                                     </div>
                                 ))}
                                 {day.items.filter(i => i.type === 'spot').length > 3 && (
-                                    <div className="flex flex-col items-center gap-1 bg-slate-50 px-1">
-                                        <div className="w-3 h-3 rounded-full bg-slate-300 border-2 border-white shadow-sm"></div>
-                                        <span className="text-[10px] text-slate-400">...</span>
+                                    <div className="flex flex-col items-center gap-1.5 bg-slate-50 px-1 z-10">
+                                        <div className="w-3.5 h-3.5 rounded-full bg-slate-300 border-2 border-white shadow-md"></div>
+                                        <span className="text-xs text-slate-400 font-bold">...</span>
                                     </div>
                                 )}
                             </div>
@@ -89,16 +147,14 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                     {/* Card */}
                                     <div className={`relative z-10 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-8 ${colorClass} border-l-[6px]`}>
                                         {/* Image Area */}
-                                        <div className="h-32 w-full bg-slate-100 relative">
-                                            {/* We rely on generic images or map placeholders if no real image */}
-                                            {/* In a real app we'd have a helper to get the image URL */}
-                                            <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-slate-50">
-                                                {item.type === 'food' ? <Utensils size={32} /> : <Camera size={32} />}
-                                            </div>
-                                            {/* Simulated Image Load (Placeholder for now) */}
-                                            {/* <Image ... /> */}
+                                        <div className="h-32 w-full bg-slate-100 relative overflow-hidden">
+                                            <SpotImage
+                                                title={item.title}
+                                                city={tripPlan.meta.city}
+                                                type={item.type}
+                                            />
 
-                                            <div className="absolute top-2 right-2 flex gap-1">
+                                            <div className="absolute top-2 right-2 flex gap-1 z-20">
                                                 {item.cost === 0 && (
                                                     <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
                                                         <Wallet size={10} /> 免费
@@ -137,7 +193,6 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                             <div className="bg-slate-100 border border-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                                                 <Clock size={10} />
                                                 <span>15m</span>
-                                                {/* Note: logic for actual travel time would go here if available */}
                                             </div>
                                         </div>
                                     )}
