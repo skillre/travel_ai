@@ -25,13 +25,14 @@ const SpotImage = ({ title, city, type }: { title: string, city: string, type: '
 
     if (imageUrl) {
         return (
-            // Use standard img tag for html2canvas compatibility (Next.js Image can be tricky with external domains + canvas)
+            // Use standard img tag for html2canvas compatibility
             // eslint-disable-next-line @next/next/no-img-element
             <img
                 src={imageUrl}
                 alt={title}
-                className="absolute inset-0 w-full h-full object-cover transition-opacity duration-500"
-                crossOrigin="anonymous" // CRITICAL for html2canvas
+                className="absolute inset-0 w-full h-full object-cover"
+                crossOrigin="anonymous"
+                style={{ objectFit: 'cover', width: '100%', height: '100%' }}
             />
         );
     }
@@ -59,46 +60,51 @@ const dayBgColors = [
     'bg-cyan-50', 'bg-violet-50', 'bg-pink-50',
 ];
 
-// 从 sub_title 提取交通/距离信息的辅助函数
-const extractTravelInfo = (nextItem?: TripPlanItem): string => {
-    if (!nextItem || !nextItem.sub_title) return '';
+// 从 sub_title 提取建议停留时间的辅助函数
+const extractStayDuration = (item: TripPlanItem): string => {
+    if (!item.sub_title) return '';
 
-    // 尝试从 sub_title 中提取距离/时间信息
-    // 格式示例: "距上一站步行 300m" 或 "距上一站车程 15分钟" 或 "建议游玩 2小时"
-    const distanceMatch = nextItem.sub_title.match(/(步行|车程|骑行|驾车)?\s*(\d+)\s*(m|km|米|公里|分钟|min)/i);
-    if (distanceMatch) {
-        const value = distanceMatch[2];
-        const unit = distanceMatch[3].toLowerCase();
-
-        // 统一转换为易读格式
-        if (unit === 'm' || unit === '米') {
-            return `${value}m`;
-        } else if (unit === 'km' || unit === '公里') {
-            return `${value}km`;
-        } else if (unit === '分钟' || unit === 'min') {
-            return `${value}min`;
-        }
-        return `${value}${unit}`;
+    // 匹配格式: "建议游玩 2小时" 或 "建议用餐 1小时" 或 "游玩 2小时" 或 "2小时"
+    const durationMatch = item.sub_title.match(/(?:建议[游玩用餐]*\s*)?(\d+[小时分钟]+)/);
+    if (durationMatch) {
+        return durationMatch[1];
     }
 
-    // 默认不显示
+    // 匹配英文格式: "2h" 或 "30min"
+    const englishMatch = item.sub_title.match(/(\d+)\s*(h|hour|min)/i);
+    if (englishMatch) {
+        const value = englishMatch[1];
+        const unit = englishMatch[2].toLowerCase();
+        if (unit === 'h' || unit === 'hour') {
+            return `${value}小时`;
+        } else if (unit === 'min') {
+            return `${value}分钟`;
+        }
+    }
+
     return '';
 };
 
 export default function TripCheatsheetView({ tripPlan, className = '', id }: TripCheatsheetViewProps) {
     return (
-        // Main Container: Force horizontal layout even on mobile for export
+        // Main Container: Force horizontal layout for export
         <div
             id={id}
             className={`flex flex-row gap-6 p-10 bg-slate-50 min-w-max items-start ${className}`}
+            style={{ display: 'flex', flexDirection: 'row', gap: '24px', padding: '40px' }}
         >
             {tripPlan.timeline.map((day, index) => {
                 const colorClass = dayColors[index % dayColors.length];
                 const textClass = dayTextColors[index % dayTextColors.length];
                 const bgClass = dayBgColors[index % dayBgColors.length];
+                const spots = day.items.filter(i => i.type === 'spot');
 
                 return (
-                    <div key={day.day} className="w-[300px] shrink-0 flex flex-col gap-4">
+                    <div
+                        key={day.day}
+                        className="w-[320px] shrink-0 flex flex-col gap-4"
+                        style={{ width: '320px', flexShrink: 0 }}
+                    >
                         {/* Day Header */}
                         <div className="flex flex-col gap-2 pb-3 border-b-4 border-slate-200">
                             <div className="flex items-center gap-2">
@@ -109,26 +115,46 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                             <h3 className="text-base font-bold text-slate-700 leading-snug mt-1 line-clamp-2 min-h-[2.5rem]">{day.day_summary}</h3>
                         </div>
 
-                        {/* Simulated Map Node Chain */}
-                        <div className="flex items-center justify-between px-2 py-3">
+                        {/* Simulated Map Node Chain - 增大圆点和文字 */}
+                        <div className="flex items-center justify-between px-1 py-3">
                             <div className="w-full flex items-center justify-between relative">
                                 {/* Connecting Line */}
-                                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-300 -z-10 border-t-2 border-dashed border-slate-300"></div>
+                                <div className="absolute top-[10px] left-0 right-0 h-0.5 bg-slate-300 border-t-2 border-dashed border-slate-300" style={{ zIndex: 0 }}></div>
 
-                                {/* Nodes (Take first 3 spots for brevity) */}
-                                {day.items.filter(i => i.type === 'spot').slice(0, 3).map((item, idx) => (
-                                    <div key={idx} className="flex flex-col items-center gap-1 bg-slate-50 px-1 z-10">
-                                        <div className={`w-3 h-3 rounded-full border-2 border-white shadow-md ${bgClass.replace('bg-', 'bg-').replace('50', '500')}`}></div>
-                                        {/* Improved Text Visibility */}
-                                        <span className="text-[10px] text-slate-700 font-bold max-w-[70px] truncate text-center leading-tight drop-shadow-sm">
+                                {/* Nodes - 显示前4个景点 */}
+                                {spots.slice(0, 4).map((item, idx) => (
+                                    <div key={idx} className="flex flex-col items-center gap-1.5 bg-slate-50 px-1" style={{ zIndex: 10 }}>
+                                        <div
+                                            className={`w-5 h-5 rounded-full border-2 border-white shadow-md ${bgClass.replace('bg-', 'bg-').replace('50', '500')}`}
+                                            style={{ width: '20px', height: '20px' }}
+                                        ></div>
+                                        {/* 增大文字，允许两行 */}
+                                        <span
+                                            className="text-xs text-slate-700 font-bold max-w-[72px] text-center leading-tight"
+                                            style={{
+                                                fontSize: '12px',
+                                                maxWidth: '72px',
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                overflow: 'hidden',
+                                                wordBreak: 'break-all'
+                                            }}
+                                        >
                                             {item.title}
                                         </span>
                                     </div>
                                 ))}
-                                {day.items.filter(i => i.type === 'spot').length > 3 && (
-                                    <div className="flex flex-col items-center gap-1 bg-slate-50 px-1 z-10">
-                                        <div className="w-3 h-3 rounded-full bg-slate-300 border-2 border-white shadow-md"></div>
-                                        <span className="text-[10px] text-slate-400 font-bold">...</span>
+                                {/* 如果超过4个景点，显示数量 */}
+                                {spots.length > 4 && (
+                                    <div className="flex flex-col items-center gap-1.5 bg-slate-50 px-1" style={{ zIndex: 10 }}>
+                                        <div
+                                            className="w-5 h-5 rounded-full bg-slate-400 border-2 border-white shadow-md flex items-center justify-center"
+                                            style={{ width: '20px', height: '20px' }}
+                                        >
+                                            <span className="text-[8px] text-white font-bold">+{spots.length - 4}</span>
+                                        </div>
+                                        <span className="text-xs text-slate-400 font-bold">更多</span>
                                     </div>
                                 )}
                             </div>
@@ -137,28 +163,40 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                         {/* Spots List */}
                         <div className="flex flex-col gap-0">
                             {day.items.map((item, itemIdx) => {
-                                // 获取下一个项目的交通信息
-                                const nextItem = day.items[itemIdx + 1];
-                                const travelInfo = extractTravelInfo(nextItem);
+                                // 获取当前地点的建议停留时间
+                                const stayDuration = extractStayDuration(item);
 
                                 return (
                                     <div key={itemIdx} className="relative group">
                                         {/* Connector Line (except for last item) */}
                                         {itemIdx < day.items.length - 1 && (
-                                            <div className="absolute left-7 top-[56px] bottom-[-16px] w-0.5 border-l-2 border-dashed border-slate-300 z-0"></div>
+                                            <div
+                                                className="absolute left-7 top-[60px] bottom-[-16px] w-0.5 border-l-2 border-dashed border-slate-300"
+                                                style={{ zIndex: 0 }}
+                                            ></div>
                                         )}
 
-                                        {/* Card - 统一高度 */}
-                                        <div className={`relative z-10 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6 ${colorClass} border-l-[5px] min-h-[200px]`}>
-                                            {/* Image Area - 固定高度 */}
-                                            <div className="h-28 w-full bg-slate-100 relative overflow-hidden shrink-0">
+                                        {/* Card - 使用 style 确保 html2canvas 正确渲染 */}
+                                        <div
+                                            className={`relative bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6 ${colorClass} border-l-[5px]`}
+                                            style={{
+                                                zIndex: 10,
+                                                minHeight: '210px',
+                                                borderLeftWidth: '5px'
+                                            }}
+                                        >
+                                            {/* Image Area - 固定高度，使用 style 确保渲染 */}
+                                            <div
+                                                className="w-full bg-slate-100 relative overflow-hidden"
+                                                style={{ height: '120px', width: '100%', position: 'relative' }}
+                                            >
                                                 <SpotImage
                                                     title={item.title}
                                                     city={tripPlan.meta.city}
                                                     type={item.type}
                                                 />
 
-                                                <div className="absolute top-2 right-2 flex gap-1 z-20">
+                                                <div className="absolute top-2 right-2 flex gap-1" style={{ zIndex: 20 }}>
                                                     {item.cost === 0 && (
                                                         <span className="bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm flex items-center gap-0.5">
                                                             <Wallet size={9} /> 免费
@@ -167,18 +205,30 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                                 </div>
 
                                                 {/* Type Badge */}
-                                                <div className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide backdrop-blur-sm z-20 ${item.type === 'food' ? 'bg-orange-500/90 text-white' : 'bg-teal-500/90 text-white'}`}>
+                                                <div
+                                                    className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide backdrop-blur-sm ${item.type === 'food' ? 'bg-orange-500/90 text-white' : 'bg-teal-500/90 text-white'}`}
+                                                    style={{ zIndex: 20 }}
+                                                >
                                                     {item.type === 'food' ? '美食' : '景点'}
                                                 </div>
                                             </div>
 
-                                            {/* Content Area - 固定内部结构 */}
+                                            {/* Content Area */}
                                             <div className="p-3 flex flex-col">
                                                 <div className="flex items-start justify-between gap-2 mb-1">
                                                     <h4 className="font-bold text-slate-800 text-sm leading-tight line-clamp-1 flex-1">{item.title}</h4>
                                                     <div className="shrink-0 text-lg">{item.emoji}</div>
                                                 </div>
-                                                <p className="text-[11px] text-slate-500 line-clamp-2 mb-2 leading-relaxed min-h-[2rem]">
+                                                <p
+                                                    className="text-[11px] text-slate-500 mb-2 leading-relaxed"
+                                                    style={{
+                                                        minHeight: '2rem',
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                        overflow: 'hidden'
+                                                    }}
+                                                >
                                                     {item.content?.desc || item.sub_title}
                                                 </p>
 
@@ -196,12 +246,15 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                             </div>
                                         </div>
 
-                                        {/* Connector Badge (Travel Time) - 使用实际数据 */}
-                                        {itemIdx < day.items.length - 1 && travelInfo && (
-                                            <div className="absolute left-1/2 -translate-x-1/2 bottom-[-10px] z-20">
-                                                <div className="bg-slate-100 border border-slate-200 text-slate-500 text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+                                        {/* 停留时间胶囊 - 显示当前地点的建议停留时间 */}
+                                        {stayDuration && (
+                                            <div
+                                                className="absolute left-1/2 -translate-x-1/2 bottom-[-8px]"
+                                                style={{ zIndex: 20 }}
+                                            >
+                                                <div className="bg-blue-50 border border-blue-200 text-blue-600 text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                                                     <Clock size={9} />
-                                                    <span>{travelInfo}</span>
+                                                    <span>{stayDuration}</span>
                                                 </div>
                                             </div>
                                         )}

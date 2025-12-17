@@ -35,23 +35,23 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
             setIsExporting(true);
 
             // Wait a moment for any last renders (images etc)
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Calculate exact width needed: 320px per day + 8px gap + padding
+            // Calculate exact width needed: 320px per day + 24px gap + 80px padding
             const daysCount = tripPlan.timeline.length;
-            const contentWidth = (daysCount * 320) + (daysCount * 32) + 200; // ample buffer
+            const contentWidth = (daysCount * 320) + ((daysCount - 1) * 24) + 80;
+            const contentHeight = exportRef.current.scrollHeight;
 
-            console.log('Starting export with width:', contentWidth);
+            console.log('Starting export with dimensions:', contentWidth, 'x', contentHeight);
 
             const canvas = await html2canvas(exportRef.current, {
-                useCORS: true, // CRITICAL for maps/images
+                useCORS: true,
                 allowTaint: true,
                 scale: 2, // Retina quality
-                backgroundColor: '#f8fafc', // match bg-slate-50
+                backgroundColor: '#f8fafc',
                 logging: false,
-                // CRITICAL: Force window dimensions to capture full scroll width
-                windowWidth: contentWidth,
-                windowHeight: exportRef.current.scrollHeight + 100,
+                windowWidth: contentWidth + 100,
+                windowHeight: contentHeight + 100,
                 scrollX: 0,
                 scrollY: 0,
                 x: 0,
@@ -59,11 +59,27 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                 onclone: (clonedDoc: Document) => {
                     const element = clonedDoc.getElementById('trip-cheatsheet-export');
                     if (element) {
-                        // Ensure the cloned element acts as a flex row
+                        // Ensure horizontal flex layout
                         element.style.display = 'flex';
                         element.style.flexDirection = 'row';
-                        element.style.width = 'max-content'; // Allow it to expand naturally
+                        element.style.width = 'max-content';
                         element.style.minWidth = `${contentWidth}px`;
+                        element.style.height = 'auto';
+
+                        // Fix all images to prevent squashing
+                        const images = element.querySelectorAll('img');
+                        images.forEach((img) => {
+                            img.style.objectFit = 'cover';
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                        });
+
+                        // Ensure all cards have proper dimensions
+                        const cards = element.querySelectorAll('[class*="rounded-xl"]');
+                        cards.forEach((card) => {
+                            const htmlCard = card as HTMLElement;
+                            htmlCard.style.overflow = 'visible';
+                        });
                     }
                 }
             });
