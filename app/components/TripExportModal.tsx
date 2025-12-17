@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import { X, Download, Share2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { X, Download, Share2, Loader2, Image as ImageIcon, FileText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
 import { TripPlan } from '../types';
 import TripCheatsheetView from './TripCheatsheetView';
 
@@ -13,10 +14,13 @@ interface TripExportModalProps {
     tripPlan: TripPlan;
 }
 
+type ExportFormat = 'png' | 'pdf';
+
 export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExportModalProps) {
     const exportRef = useRef<HTMLDivElement>(null);
     const [isExporting, setIsExporting] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [exportFormat, setExportFormat] = useState<ExportFormat>('pdf');
 
     // Reset state when opening
     useEffect(() => {
@@ -28,16 +32,16 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
 
     if (!isOpen) return null;
 
-    const generateImage = async (shouldDownload: boolean = true) => {
+    const generateExport = async () => {
         if (!exportRef.current) return;
 
         try {
             setIsExporting(true);
 
-            // Wait a moment for any last renders (images etc)
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait for images to load
+            await new Promise(resolve => setTimeout(resolve, 1200));
 
-            // Calculate exact width needed: 320px per day + 24px gap + 80px padding
+            // Calculate dimensions
             const daysCount = tripPlan.timeline.length;
             const contentWidth = (daysCount * 320) + ((daysCount - 1) * 24) + 80;
             const contentHeight = exportRef.current.scrollHeight;
@@ -47,7 +51,7 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
             const canvas = await html2canvas(exportRef.current, {
                 useCORS: true,
                 allowTaint: true,
-                scale: 2, // Retina quality
+                scale: 2, // High quality
                 backgroundColor: '#f8fafc',
                 logging: false,
                 windowWidth: contentWidth + 100,
@@ -59,14 +63,13 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                 onclone: (clonedDoc: Document) => {
                     const element = clonedDoc.getElementById('trip-cheatsheet-export');
                     if (element) {
-                        // Ensure horizontal flex layout
                         element.style.display = 'flex';
                         element.style.flexDirection = 'row';
                         element.style.width = 'max-content';
                         element.style.minWidth = `${contentWidth}px`;
                         element.style.height = 'auto';
 
-                        // Fix all images to prevent squashing
+                        // Fix all images
                         const images = element.querySelectorAll('img');
                         images.forEach((img) => {
                             img.style.objectFit = 'cover';
@@ -74,7 +77,7 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                             img.style.height = '100%';
                         });
 
-                        // Ensure all cards have proper dimensions
+                        // Ensure cards overflow is visible
                         const cards = element.querySelectorAll('[class*="rounded-xl"]');
                         cards.forEach((card) => {
                             const htmlCard = card as HTMLElement;
@@ -87,21 +90,32 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
             const base64Image = canvas.toDataURL('image/png');
             setGeneratedImage(base64Image);
 
-            if (shouldDownload) {
-                // Try automatic download
+            // Export based on selected format
+            if (exportFormat === 'pdf') {
+                // Create PDF with original canvas dimensions
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                pdf.addImage(base64Image, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${tripPlan.meta.city}_行程总览.pdf`);
+            } else {
+                // PNG export
                 try {
-                    canvas.toBlob((blob) => {
+                    canvas.toBlob((blob: Blob | null) => {
                         if (blob) {
-                            saveAs(blob, `${tripPlan.meta.city}_Trip_Overview.png`);
+                            saveAs(blob, `${tripPlan.meta.city}_行程总览.png`);
                         }
                     });
                 } catch (e) {
-                    console.warn('Auto download failed, falling back to manual save', e);
+                    console.warn('Auto download failed:', e);
                 }
             }
         } catch (error) {
             console.error('Export failed:', error);
-            alert('生成图片失败，请重试');
+            alert('生成失败，请重试');
         } finally {
             setIsExporting(false);
         }
@@ -118,7 +132,7 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-slate-800">行程总览导出</h2>
-                            <p className="text-xs text-slate-500">生成高清长图，方便分享</p>
+                            <p className="text-xs text-slate-500">生成高清长图或PDF，方便分享与保存</p>
                         </div>
                     </div>
                     <button
@@ -129,7 +143,7 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                     </button>
                 </div>
 
-                {/* Content Area - Fixed Scrolling */}
+                {/* Content Area */}
                 <div className="flex-1 bg-slate-100 overflow-auto relative p-4 md:p-8">
                     {generatedImage ? (
                         <div className="flex flex-col items-center animate-in zoom-in duration-300 min-h-full justify-center">
@@ -140,16 +154,18 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                                     className="max-h-[65vh] w-auto rounded-lg object-contain"
                                 />
                             </div>
-                            <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-medium animate-pulse shrink-0">
+                            <div className="mt-4 flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
                                 <ImageIcon className="w-4 h-4" />
-                                <span>如果未自动下载，请长按图片保存到相册</span>
+                                <span>
+                                    {exportFormat === 'pdf'
+                                        ? 'PDF已生成！文件应已自动下载'
+                                        : '如未自动下载，请长按图片保存'}
+                                </span>
                             </div>
                         </div>
                     ) : (
-                        // Wrapper to ensure scroll is possible in all directions
                         <div className="inline-block min-w-full min-h-full">
                             <div className="shadow-xl bg-slate-50 rounded-xl overflow-hidden w-fit mx-auto">
-                                {/* Original DOM for Preview & Capture */}
                                 <div ref={exportRef} className="bg-slate-50">
                                     <TripCheatsheetView
                                         tripPlan={tripPlan}
@@ -163,12 +179,43 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
 
                 {/* Footer / Actions */}
                 <div className="px-6 py-4 border-t border-slate-100 bg-white flex justify-between items-center z-10">
-                    <button
-                        onClick={() => setGeneratedImage(null)}
-                        className={`text-sm text-slate-500 hover:text-slate-700 underline ${!generatedImage ? 'invisible' : ''}`}
-                    >
-                        返回预览
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {!generatedImage && (
+                            <>
+                                <span className="text-sm text-slate-500">导出格式：</span>
+                                <div className="flex bg-slate-100 rounded-lg p-0.5">
+                                    <button
+                                        onClick={() => setExportFormat('pdf')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${exportFormat === 'pdf'
+                                                ? 'bg-white text-indigo-600 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        <FileText size={14} />
+                                        PDF
+                                    </button>
+                                    <button
+                                        onClick={() => setExportFormat('png')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${exportFormat === 'png'
+                                                ? 'bg-white text-indigo-600 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700'
+                                            }`}
+                                    >
+                                        <ImageIcon size={14} />
+                                        PNG
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                        {generatedImage && (
+                            <button
+                                onClick={() => setGeneratedImage(null)}
+                                className="text-sm text-slate-500 hover:text-slate-700 underline"
+                            >
+                                返回预览
+                            </button>
+                        )}
+                    </div>
 
                     <div className="flex gap-3">
                         <button
@@ -180,25 +227,25 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
 
                         {!generatedImage ? (
                             <button
-                                onClick={() => generateImage(true)}
+                                onClick={generateExport}
                                 disabled={isExporting}
                                 className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-95"
                             >
                                 {isExporting ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                        正在生成长图...
+                                        正在生成...
                                     </>
                                 ) : (
                                     <>
-                                        <Download className="w-4 h-4" />
-                                        生成总览图片
+                                        {exportFormat === 'pdf' ? <FileText className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                                        生成{exportFormat === 'pdf' ? 'PDF' : '图片'}
                                     </>
                                 )}
                             </button>
                         ) : (
                             <button
-                                onClick={() => generateImage(true)} // Re-trigger download logic if needed
+                                onClick={generateExport}
                                 className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-md transition-all active:scale-95"
                             >
                                 <Download className="w-4 h-4" />

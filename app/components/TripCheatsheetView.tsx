@@ -246,11 +246,11 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                             </div>
                                         </div>
 
-                                        {/* 停留时间胶囊 - 显示当前地点的建议停留时间 */}
+                                        {/* 停留时间胶囊 - 放在卡片上方 */}
                                         {stayDuration && (
                                             <div
-                                                className="absolute left-1/2 -translate-x-1/2 bottom-[-8px]"
-                                                style={{ zIndex: 20 }}
+                                                className="absolute left-1/2 -translate-x-1/2 top-[-12px]"
+                                                style={{ zIndex: 25 }}
                                             >
                                                 <div className="bg-blue-50 border border-blue-200 text-blue-600 text-[9px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
                                                     <Clock size={9} />
