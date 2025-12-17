@@ -208,13 +208,14 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     />
 
                     {/* 移动端分享按钮 - 右上角 */}
-                    <div className="absolute top-4 right-4 z-40">
+                    <div className="absolute top-4 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150">
                         <button
                             onClick={() => setIsExportModalOpen(true)}
-                            className="p-3 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 text-indigo-600 hover:bg-slate-50 transition-all active:scale-95"
-                            aria-label="分享行程"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
+                            aria-label="导出行程"
                         >
-                            <Share2 className="w-5 h-5" />
+                            <span className="text-sm">🗺️</span>
+                            <span>导出</span>
                         </button>
                     </div>
 
@@ -305,10 +306,10 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                                     {/* Desktop Export Button */}
                                     <button
                                         onClick={() => setIsExportModalOpen(true)}
-                                        className="flex items-center gap-1 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold transition-colors"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold transition-colors border border-indigo-100"
                                     >
-                                        <Share2 className="w-3.5 h-3.5" />
-                                        分享行程
+                                        <Map className="w-3.5 h-3.5" />
+                                        导出总览
                                     </button>
                                 </div>
 
@@ -321,6 +322,17 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
 
                             {/* 天数切换按钮组 - Sticky Top */}
                             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-sm flex items-center gap-2 p-3 border-b border-slate-100 overflow-x-auto no-scrollbar">
+                                {/* 总览按钮 - 触发导出弹窗 */}
+                                <button
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:shadow-sm"
+                                >
+                                    <Map className="w-3.5 h-3.5" />
+                                    总览
+                                </button>
+
+                                <div className="w-[1px] h-4 bg-slate-300 mx-1"></div>
+
                                 <button
                                     onClick={() => handleSelectDay(null)}
                                     className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${selectedDay === null
