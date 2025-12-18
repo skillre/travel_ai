@@ -44,7 +44,9 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Install Puppeteer dependencies and fonts (Google Noto CJK)
-RUN apt-get update \
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
+    && apt-get update \
     && apt-get install -y wget gnupg \
     && apt-get install -y chromium \
     && apt-get install -y fonts-noto-cjk \
