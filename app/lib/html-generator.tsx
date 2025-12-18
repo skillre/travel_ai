@@ -1,4 +1,5 @@
 
+import 'server-only';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TripPlan, TripPlanDay } from '../types';
 import TripCheatsheetView from '../components/TripCheatsheetView';
