@@ -69,14 +69,6 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                         element.style.minWidth = `${contentWidth}px`;
                         element.style.height = 'auto';
 
-                        // Fix all images
-                        const images = element.querySelectorAll('img');
-                        images.forEach((img) => {
-                            img.style.objectFit = 'cover';
-                            img.style.width = '100%';
-                            img.style.height = '100%';
-                        });
-
                         // Ensure cards overflow is visible
                         const cards = element.querySelectorAll('[class*="rounded-xl"]');
                         cards.forEach((card) => {
@@ -187,8 +179,8 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                                     <button
                                         onClick={() => setExportFormat('pdf')}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${exportFormat === 'pdf'
-                                                ? 'bg-white text-indigo-600 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
+                                            ? 'bg-white text-indigo-600 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
                                             }`}
                                     >
                                         <FileText size={14} />
@@ -197,8 +189,8 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                                     <button
                                         onClick={() => setExportFormat('png')}
                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${exportFormat === 'png'
-                                                ? 'bg-white text-indigo-600 shadow-sm'
-                                                : 'text-slate-500 hover:text-slate-700'
+                                            ? 'bg-white text-indigo-600 shadow-sm'
+                                            : 'text-slate-500 hover:text-slate-700'
                                             }`}
                                     >
                                         <ImageIcon size={14} />

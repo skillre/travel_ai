@@ -25,14 +25,14 @@ const SpotImage = ({ title, city, type }: { title: string, city: string, type: '
 
     if (imageUrl) {
         return (
-            // Use standard img tag for html2canvas compatibility
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-                src={imageUrl}
-                alt={title}
-                className="absolute inset-0 w-full h-full object-cover"
-                crossOrigin="anonymous"
-                style={{ objectFit: 'cover', width: '100%', height: '100%' }}
+            // Use background-image for better html2canvas support with object-fit: cover
+            <div
+                className="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat"
+                style={{
+                    backgroundImage: `url(${imageUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
             />
         );
     }
