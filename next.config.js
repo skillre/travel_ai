@@ -15,12 +15,10 @@ const nextConfig = {
                 protocol: 'https',
                 hostname: 'picsum.photos',
             },
-            hostname: 'picsum.photos',
-            },
         ],
     },
-experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core'],
+    experimental: {
+        serverComponentsExternalPackages: ['puppeteer-core'],
     },
 };
 
