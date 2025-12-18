@@ -49,7 +49,7 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y wget gnupg \
     && apt-get install -y chromium \
-    && apt-get install -y fonts-noto-cjk \
+    && apt-get install -y fonts-noto-cjk fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
 

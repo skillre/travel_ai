@@ -161,6 +161,101 @@ function generateExportHtml(type: string, tripPlan: TripPlan, dayPlan?: TripPlan
     return buildFullHtml(componentHtml);
 }
 
+// --- Image Resolution Helpers ---
+
+// Cache for server-side fetches
+const serverImageCache = new Map<string, { url: string; timestamp: number }>();
+const CACHE_TTL = 1000 * 60 * 60; // 1 hour
+
+function generateSeedFromQuery(query: string): number {
+    let hash = 0;
+    for (let i = 0; i < query.length; i++) {
+        const char = query.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash % 1000) + 1;
+}
+
+function getFallbackImageUrl(query: string): string {
+    const seed = generateSeedFromQuery(query);
+    return `https://picsum.photos/seed/${seed}/800/600`;
+}
+
+async function resolveImagesForTripPlan(tripPlan: TripPlan): Promise<void> {
+    const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+
+    // Collect all items that need images
+    const jobs: Array<{ item: TripPlanItem, query: string }> = [];
+
+    tripPlan.timeline.forEach(day => {
+        if (!day.items) return;
+        day.items.forEach(item => {
+            if (item.type === 'spot' && !item.resolvedImageUrl) {
+                const query = `${item.title} ${tripPlan.meta.city}`;
+                jobs.push({ item, query });
+            }
+        });
+    });
+
+    if (jobs.length === 0) return;
+
+    console.log(`[Export API] Resolving ${jobs.length} missing images...`);
+
+    // Process in parallel with concurrency limit (e.g., 5)
+    // For simplicity here, we just use Promise.all but Unsplash might rate limit.
+    // Since this is export, let's limit to first 10 or parallelize carefully.
+
+    const resolveJob = async (job: { item: TripPlanItem, query: string }) => {
+        const { item, query } = job;
+
+        // Check cache
+        const cached = serverImageCache.get(query);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+            item.resolvedImageUrl = cached.url;
+            return;
+        }
+
+        if (!accessKey) {
+            item.resolvedImageUrl = getFallbackImageUrl(query);
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query + ' travel china')}&per_page=1&orientation=landscape`,
+                {
+                    headers: { 'Authorization': `Client-ID ${accessKey}` },
+                    next: { revalidate: 3600 } // Next.js fetch cache
+                }
+            );
+
+            if (!response.ok) throw new Error(`Status ${response.status}`);
+
+            const data = await response.json();
+            if (data.results && data.results.length > 0) {
+                const url = data.results[0].urls.regular;
+                item.resolvedImageUrl = url;
+                serverImageCache.set(query, { url, timestamp: Date.now() });
+            } else {
+                const fallback = getFallbackImageUrl(query);
+                item.resolvedImageUrl = fallback;
+                serverImageCache.set(query, { url: fallback, timestamp: Date.now() });
+            }
+        } catch (err) {
+            console.warn(`[Export API] Failed to fetch image for ${query}:`, err);
+            item.resolvedImageUrl = getFallbackImageUrl(query);
+        }
+    };
+
+    // Execute in batches to be nice to API
+    const batchSize = 5;
+    for (let i = 0; i < jobs.length; i += batchSize) {
+        const batch = jobs.slice(i, i + batchSize);
+        await Promise.all(batch.map(resolveJob));
+    }
+}
+
 // --- Main Route Handler ---
 
 export async function POST(req: NextRequest) {
@@ -172,10 +267,31 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing tripPlan' }, { status: 400 });
         }
 
+        // 0. Resolve Images Context (Pre-process)
+        // If the client didn't send images (resolvedImageUrl), we fetch them now.
+        // We modify the tripPlan object in place before generating HTML.
+        await resolveImagesForTripPlan(tripPlan as TripPlan);
+
+        // Note: dayPlan is a subset of tripPlan, but it's passed separately in the request body.
+        // It's safer to not rely on dayPlan having images if tripPlan was mutated.
+        // However, if we mutated tripPlan's internal objects, and dayPlan refers to the same objects... wait.
+        // The dayPlan in body is likely a separate copy or reference.
+        // To be safe, if type === 'day', we should also resolve images for dayPlan explicitly 
+        // OR just re-extract the relevant day from the now-hydrated tripPlan.
+
+        let targetDayPlan = dayPlan;
+        if (type === 'day' && dayPlan) {
+            // Find corresponding day in hydrated tripPlan to ensure it has images
+            const foundDay = (tripPlan as TripPlan).timeline.find(d => d.day === dayPlan.day);
+            if (foundDay) {
+                targetDayPlan = foundDay;
+            }
+        }
+
         // 1. 生成 HTML
         let fullHtml = '';
         try {
-            fullHtml = generateExportHtml(type, tripPlan as TripPlan, dayPlan as TripPlanDay);
+            fullHtml = generateExportHtml(type, tripPlan as TripPlan, targetDayPlan as TripPlanDay);
         } catch (err: any) {
             console.error('HTML Generation Error:', err);
             return NextResponse.json({ error: err.message }, { status: 400 });
@@ -211,11 +327,11 @@ export async function POST(req: NextRequest) {
 
             await page.setContent(fullHtml, {
                 waitUntil: 'networkidle0',
-                timeout: 30000
+                timeout: 60000 // Increased timeout for images
             });
 
             console.log('[Export API] Waiting for resources...');
-            await page.waitForFunction('window.isReadyForExport === true', { timeout: 15000 }).catch(() => {
+            await page.waitForFunction('window.isReadyForExport === true', { timeout: 30000 }).catch(() => {
                 console.warn('[Export API] Wait for resources timeout, proceeding anyway...');
             });
 

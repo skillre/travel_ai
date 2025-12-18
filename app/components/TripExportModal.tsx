@@ -110,7 +110,35 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
             // 预处理 tripPlan 数据，尝试注入已知的图片 URL (如果有全局缓存)
             // 这里我们做一个简单的深拷贝，准备发送给 API
             const tripPlanPayload = JSON.parse(JSON.stringify(tripPlan));
-            // TODO: 如果有图片缓存，在这里注入 resolvedImageUrl
+
+            // 注入图片缓存 (Client Side Cache -> TripPlan Payload)
+            // 这样 API Route 可以直接使用客户端已经加载的图片，无需重复请求
+            // 注意：这里需要引入 getGlobalImageCache，由于是同一个 module scope，
+            // 只要 useUnsplashImage.ts 被加载过，cache 就存在。
+            const { getGlobalImageCache } = await import('../hooks/useUnsplashImage');
+            const cache = getGlobalImageCache();
+
+            if (cache.size > 0 && tripPlanPayload.timeline) {
+                tripPlanPayload.timeline.forEach((day: any) => {
+                    if (day.items) {
+                        day.items.forEach((item: any) => {
+                            if (item.type === 'spot') {
+                                // 尝试匹配缓存 key: `${item.title}-${city}` or `${item.title}-${city}-spot`
+                                // useUnsplashImage hook 内部 key 规则: 
+                                // loose matching logic
+                                const baseKey = `${item.title}-${tripPlan.meta.city}`;
+                                const strictKey = `${baseKey}-spot`;
+
+                                if (cache.has(strictKey)) {
+                                    item.resolvedImageUrl = cache.get(strictKey);
+                                } else if (cache.has(baseKey)) {
+                                    item.resolvedImageUrl = cache.get(baseKey);
+                                }
+                            }
+                        });
+                    }
+                });
+            }
 
             for (let i = 0; i < totalTargets; i++) {
                 const target = captureTargets[i];

@@ -135,4 +135,12 @@ export async function preloadImages(
     );
 }
 
+/**
+ * 获取全局图片缓存
+ * 用于在导出时同步已加载的图片 URL
+ */
+export function getGlobalImageCache(): Map<string, string> {
+    return imageCache;
+}
+
 export default useUnsplashImage;
