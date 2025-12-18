@@ -12,7 +12,27 @@ interface TripCheatsheetViewProps {
 }
 
 // Helper component for loading images - 使用与 ItineraryCard 相同的 hook 确保图片一致
-const SpotImage = ({ title, city, type }: { title: string, city: string, type: 'spot' | 'food' }) => {
+// Helper component for loading images - 使用与 ItineraryCard 相同的 hook 确保图片一致
+// 并支持 SSR 模式 (当传入 resolvedImageUrl 时不使用 Hook)
+const SpotImage = ({ title, city, type, resolvedImageUrl }: { title: string, city: string, type: 'spot' | 'food', resolvedImageUrl?: string }) => {
+    // 如果有预解析的图片 URL，直接使用（SSR 模式）
+    if (resolvedImageUrl) {
+        return (
+            <img
+                src={resolvedImageUrl}
+                alt={title}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                    display: 'block'
+                }}
+            />
+        );
+    }
+
+    // 否则使用 Hook (客户端模式)
     const { imageUrl, isLoading } = useUnsplashImage(title, city, type);
 
     if (isLoading) {
@@ -217,6 +237,7 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                                                     title={item.title}
                                                     city={tripPlan.meta.city}
                                                     type={item.type}
+                                                    resolvedImageUrl={item.resolvedImageUrl}
                                                 />
 
                                                 <div className="absolute top-2 right-2 flex gap-1" style={{ zIndex: 20 }}>
