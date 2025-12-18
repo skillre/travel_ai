@@ -8,8 +8,10 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-# Use npm install to handle both lockfile and new dependencies in package.json
-RUN npm install
+# Use npm mirror for better connectivity in China and remove lockfile to prevent conflicts
+RUN npm config set registry https://registry.npmmirror.com && \
+    rm -f package-lock.json && \
+    npm install
 
 
 # Rebuild the source code only when needed
