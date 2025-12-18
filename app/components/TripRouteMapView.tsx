@@ -117,8 +117,8 @@ const generateConnectorPath = (nodes: NodePosition[], containerWidth: number, co
 };
 
 export default function TripRouteMapView({ tripPlan, className = '', id }: TripRouteMapViewProps) {
-    const containerWidth = 450; // Fixed width for 3:4 ratio (portrait)
-    const containerHeight = 600; // Fixed height for 3:4 ratio
+    const containerWidth = 1350; // 3x width (was 450)
+    const containerHeight = 720; // 1.2x height (was 600)
 
     const nodes = generateNodePositions(tripPlan);
     const svgPath = generateConnectorPath(nodes, containerWidth, containerHeight);
@@ -139,24 +139,24 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
         >
             {/* Background Decorations - City Silhouette Watermark */}
             <div className="absolute inset-0 pointer-events-none opacity-[0.04]">
-                {/* Abstract city skyline pattern */}
-                <svg className="w-full h-full" viewBox="0 0 450 600" xmlns="http://www.w3.org/2000/svg">
-                    {/* Building silhouettes at bottom */}
+                {/* Abstract city skyline pattern - centered and aligned to bottom */}
+                <svg className="w-full h-full" viewBox="0 0 1350 720" xmlns="http://www.w3.org/2000/svg">
+                    {/* Building silhouettes at bottom - Shifted X+450, Y+120 */}
                     <g fill="#334155">
-                        <rect x="20" y="520" width="40" height="80" />
-                        <rect x="70" y="480" width="35" height="120" />
-                        <rect x="115" y="500" width="50" height="100" />
-                        <rect x="175" y="470" width="30" height="130" />
-                        <rect x="215" y="490" width="45" height="110" />
-                        <rect x="270" y="510" width="35" height="90" />
-                        <rect x="315" y="475" width="40" height="125" />
-                        <rect x="365" y="495" width="35" height="105" />
-                        <rect x="410" y="515" width="25" height="85" />
+                        <rect x="470" y="640" width="40" height="80" />
+                        <rect x="520" y="600" width="35" height="120" />
+                        <rect x="565" y="620" width="50" height="100" />
+                        <rect x="625" y="590" width="30" height="130" />
+                        <rect x="665" y="610" width="45" height="110" />
+                        <rect x="720" y="630" width="35" height="90" />
+                        <rect x="765" y="595" width="40" height="125" />
+                        <rect x="815" y="615" width="35" height="105" />
+                        <rect x="860" y="635" width="25" height="85" />
                     </g>
-                    {/* Geometric circles for decoration */}
-                    <circle cx="100" cy="150" r="60" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx="350" cy="250" r="80" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx="200" cy="400" r="50" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
+                    {/* Geometric circles for decoration - Shifted X+450 */}
+                    <circle cx="550" cy="150" r="60" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
+                    <circle cx="800" cy="250" r="80" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
+                    <circle cx="650" cy="400" r="50" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
                 </svg>
             </div>
 
