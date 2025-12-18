@@ -8,10 +8,12 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-# Use npm mirror for better connectivity in China and remove lockfile to prevent conflicts
-RUN npm config set registry https://registry.npmmirror.com && \
-    rm -f package-lock.json && \
-    npm install
+# Use npm mirror and robust install settings
+RUN npm config set registry https://registry.npmmirror.com
+# Remove potential conflicting lockfile
+RUN rm -f package-lock.json
+# Install dependencies with legacy-peer-deps to bypass strict graph issues
+RUN npm install --legacy-peer-deps --no-audit
 
 
 # Rebuild the source code only when needed
