@@ -41,44 +41,34 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
             // Wait for images to load completely
             await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Get the actual rendered element dimensions dynamically
             const element = exportRef.current;
 
-            // Force the element to display its full size for measurement
-            const originalOverflow = element.style.overflow;
-            const originalPosition = element.style.position;
-            element.style.overflow = 'visible';
-            element.style.position = 'relative';
+            // 找到实际的导出容器
+            const exportContainer = element.querySelector('#trip-cheatsheet-export') as HTMLElement;
+            if (!exportContainer) {
+                throw new Error('Export container not found');
+            }
 
-            // Get actual content dimensions - this is the KEY fix
-            // Use getBoundingClientRect for accurate measurement
-            const rect = element.getBoundingClientRect();
-            const actualWidth = Math.max(element.scrollWidth, element.offsetWidth, rect.width);
-            const actualHeight = Math.max(element.scrollHeight, element.offsetHeight, rect.height);
+            // 获取真实的内容尺寸 - 这是关键！
+            const actualWidth = exportContainer.scrollWidth;
+            const actualHeight = exportContainer.scrollHeight;
 
-            // Add generous padding to ensure nothing is cut off
-            const exportWidth = Math.ceil(actualWidth) + 100;
-            const exportHeight = Math.ceil(actualHeight) + 100;
+            console.log('=== Export Debug ===');
+            console.log('Content dimensions:', actualWidth, 'x', actualHeight);
 
-            console.log('Dynamic export dimensions:', {
-                scrollWidth: element.scrollWidth,
-                scrollHeight: element.scrollHeight,
-                offsetWidth: element.offsetWidth,
-                offsetHeight: element.offsetHeight,
-                boundingRect: rect,
-                finalExport: `${exportWidth} x ${exportHeight}`
-            });
+            // 使用 scale: 2 来获得高清图片
+            const scale = 2;
 
-            const canvas = await html2canvas(element, {
+            const canvas = await html2canvas(exportContainer, {
                 useCORS: true,
                 allowTaint: true,
-                scale: 2, // High quality export
+                scale: scale,
                 backgroundColor: '#f8fafc',
-                logging: true, // Enable logging for debugging
-                width: exportWidth,
-                height: exportHeight,
-                windowWidth: exportWidth,
-                windowHeight: exportHeight,
+                logging: true,
+                // 关键：不要设置 width/height，让 html2canvas 自动计算
+                // 只设置 windowWidth/windowHeight 来模拟视口
+                windowWidth: actualWidth + 200,
+                windowHeight: actualHeight + 200,
                 scrollX: 0,
                 scrollY: 0,
                 x: 0,
@@ -86,65 +76,66 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                 onclone: (clonedDoc: Document) => {
                     const clonedElement = clonedDoc.getElementById('trip-cheatsheet-export');
                     if (clonedElement) {
-                        // Force flex layout with explicit dimensions
+                        // 强制设置容器为自然尺寸
+                        clonedElement.style.position = 'relative';
                         clonedElement.style.display = 'flex';
                         clonedElement.style.flexDirection = 'row';
                         clonedElement.style.flexWrap = 'nowrap';
-                        clonedElement.style.width = `${exportWidth}px`;
-                        clonedElement.style.minWidth = `${exportWidth}px`;
-                        clonedElement.style.maxWidth = 'none';
+                        clonedElement.style.width = 'auto';
+                        clonedElement.style.minWidth = `${actualWidth}px`;
                         clonedElement.style.height = 'auto';
                         clonedElement.style.minHeight = `${actualHeight}px`;
                         clonedElement.style.overflow = 'visible';
                         clonedElement.style.transform = 'none';
-                        clonedElement.style.position = 'relative';
 
-                        // Ensure all day columns maintain their width
-                        const dayColumns = clonedElement.querySelectorAll(':scope > div');
+                        // 确保每个日期列保持固定宽度且不压缩高度
+                        const dayColumns = clonedElement.querySelectorAll('[data-day-column="true"]');
                         dayColumns.forEach((col) => {
                             const htmlCol = col as HTMLElement;
                             htmlCol.style.width = '320px';
                             htmlCol.style.minWidth = '320px';
                             htmlCol.style.maxWidth = '320px';
                             htmlCol.style.flexShrink = '0';
+                            htmlCol.style.height = 'auto';
                             htmlCol.style.overflow = 'visible';
                         });
 
-                        // Ensure cards overflow is visible
-                        const cards = clonedElement.querySelectorAll('[class*="rounded-xl"]');
-                        cards.forEach((card) => {
-                            const htmlCard = card as HTMLElement;
-                            htmlCard.style.overflow = 'visible';
-                        });
-
-                        // Ensure images are fully rendered
-                        const images = clonedElement.querySelectorAll('img, [style*="background-image"]');
-                        images.forEach((img) => {
-                            const htmlImg = img as HTMLElement;
-                            htmlImg.style.visibility = 'visible';
-                            htmlImg.style.opacity = '1';
+                        // 确保所有卡片可见
+                        const allElements = clonedElement.querySelectorAll('*');
+                        allElements.forEach((el) => {
+                            const htmlEl = el as HTMLElement;
+                            if (htmlEl.style) {
+                                htmlEl.style.visibility = 'visible';
+                                // 不要设置 transform: none，因为可能会影响一些定位
+                            }
                         });
                     }
                 }
             });
 
-            // Restore original styles
-            element.style.overflow = originalOverflow;
-            element.style.position = originalPosition;
+            console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+            console.log('Expected dimensions with scale:', actualWidth * scale, 'x', actualHeight * scale);
 
-            const base64Image = canvas.toDataURL('image/png');
+            const base64Image = canvas.toDataURL('image/png', 1.0);
             setGeneratedImage(base64Image);
 
-            // Export based on selected format
+            // 导出
             if (exportFormat === 'pdf') {
-                // Create PDF with original canvas dimensions
+                // 关键修复：PDF 使用逻辑尺寸（除以 scale），而不是像素尺寸
+                const pdfWidth = canvas.width / scale;
+                const pdfHeight = canvas.height / scale;
+
+                console.log('PDF dimensions:', pdfWidth, 'x', pdfHeight);
+
                 const pdf = new jsPDF({
-                    orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                    orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
                     unit: 'px',
-                    format: [canvas.width, canvas.height]
+                    format: [pdfWidth, pdfHeight],
+                    hotfixes: ['px_scaling'] // 修复像素缩放问题
                 });
 
-                pdf.addImage(base64Image, 'PNG', 0, 0, canvas.width, canvas.height);
+                // 使用逻辑尺寸添加图片
+                pdf.addImage(base64Image, 'PNG', 0, 0, pdfWidth, pdfHeight);
                 pdf.save(`${tripPlan.meta.city}_行程总览.pdf`);
             } else {
                 // PNG export
@@ -153,7 +144,7 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                         if (blob) {
                             saveAs(blob, `${tripPlan.meta.city}_行程总览.png`);
                         }
-                    });
+                    }, 'image/png', 1.0);
                 } catch (e) {
                     console.warn('Auto download failed:', e);
                 }
