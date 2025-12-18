@@ -90,6 +90,40 @@ const buildFullHtml = (componentHtml: string) => {
   `;
 };
 
+// Server-side simple image renderer (no hooks)
+const ServerSpotImage = ({ title, city, type, resolvedImageUrl }: { title: string; city: string; type: 'spot' | 'food'; resolvedImageUrl?: string }) => {
+    if (resolvedImageUrl) {
+        return (
+            <img
+                src={resolvedImageUrl}
+                alt={title}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    objectPosition: 'center',
+                    display: 'block'
+                }}
+            />
+        );
+    }
+    // Static Fallback
+    return (
+        <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#f8fafc',
+            color: '#cbd5e1'
+        }}>
+            {/* SVG Icons since we can't use Lucide if context is weird, but we imported them so it's fine */}
+            {type === 'food' ? <Utensils size={32} /> : <Camera size={32} />}
+        </div>
+    );
+};
+
 function generateExportHtml(type: string, tripPlan: TripPlan, dayPlan?: TripPlanDay): string {
     // 使用 require 动态引入以绕过 Next.js 的静态分析检查
     // @ts-ignore
@@ -99,7 +133,10 @@ function generateExportHtml(type: string, tripPlan: TripPlan, dayPlan?: TripPlan
 
     if (type === 'overview') {
         componentHtml = renderToStaticMarkup(
-            <TripCheatsheetView tripPlan={tripPlan} />
+            <TripCheatsheetLayout
+                tripPlan={tripPlan}
+                renderImage={(props) => <ServerSpotImage {...props} />}
+            />
         );
     } else if (type === 'map') {
         componentHtml = renderToStaticMarkup(
@@ -110,10 +147,11 @@ function generateExportHtml(type: string, tripPlan: TripPlan, dayPlan?: TripPlan
             throw new Error('Missing dayPlan for day export');
         }
         componentHtml = renderToStaticMarkup(
-            <DayDetailExportView
+            <DayDetailLayout
                 dayPlan={dayPlan}
                 meta={tripPlan.meta}
                 showQRCode={true}
+                renderImage={(props) => <ServerSpotImage {...props} />}
             />
         );
     } else {
