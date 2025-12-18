@@ -86,12 +86,28 @@ const extractStayDuration = (item: TripPlanItem): string => {
 };
 
 export default function TripCheatsheetView({ tripPlan, className = '', id }: TripCheatsheetViewProps) {
+    const totalDays = tripPlan.timeline.length;
+    // Calculate minimum width based on number of days
+    // Each day column is 320px, gap is 24px, plus 80px padding
+    const minContainerWidth = (totalDays * 320) + ((totalDays - 1) * 24) + 80;
+
     return (
         // Main Container: Force horizontal layout for export
         <div
             id={id}
-            className={`flex flex-row gap-6 p-10 bg-slate-50 min-w-max items-start ${className}`}
-            style={{ display: 'flex', flexDirection: 'row', gap: '24px', padding: '40px' }}
+            data-export-container="true"
+            className={`flex flex-row gap-6 p-10 bg-slate-50 items-start ${className}`}
+            style={{
+                display: 'flex',
+                flexDirection: 'row',
+                flexWrap: 'nowrap',
+                gap: '24px',
+                padding: '40px',
+                width: 'fit-content',
+                minWidth: `${minContainerWidth}px`,
+                maxWidth: 'none',
+                overflow: 'visible',
+            }}
         >
             {tripPlan.timeline.map((day, index) => {
                 const colorClass = dayColors[index % dayColors.length];
@@ -102,8 +118,15 @@ export default function TripCheatsheetView({ tripPlan, className = '', id }: Tri
                 return (
                     <div
                         key={day.day}
-                        className="w-[320px] shrink-0 flex flex-col gap-4"
-                        style={{ width: '320px', flexShrink: 0 }}
+                        data-day-column="true"
+                        className="shrink-0 flex flex-col gap-4"
+                        style={{
+                            width: '320px',
+                            minWidth: '320px',
+                            maxWidth: '320px',
+                            flexShrink: 0,
+                            flexGrow: 0,
+                        }}
                     >
                         {/* Day Header */}
                         <div className="flex flex-col gap-2 pb-3 border-b-4 border-slate-200">

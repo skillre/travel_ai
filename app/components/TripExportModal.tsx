@@ -38,46 +38,99 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
         try {
             setIsExporting(true);
 
-            // Wait for images to load
-            await new Promise(resolve => setTimeout(resolve, 1200));
+            // Wait for images to load completely
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Calculate dimensions
-            const daysCount = tripPlan.timeline.length;
-            const contentWidth = (daysCount * 320) + ((daysCount - 1) * 24) + 80;
-            const contentHeight = exportRef.current.scrollHeight;
+            // Get the actual rendered element dimensions dynamically
+            const element = exportRef.current;
 
-            console.log('Starting export with dimensions:', contentWidth, 'x', contentHeight);
+            // Force the element to display its full size for measurement
+            const originalOverflow = element.style.overflow;
+            const originalPosition = element.style.position;
+            element.style.overflow = 'visible';
+            element.style.position = 'relative';
 
-            const canvas = await html2canvas(exportRef.current, {
+            // Get actual content dimensions - this is the KEY fix
+            // Use getBoundingClientRect for accurate measurement
+            const rect = element.getBoundingClientRect();
+            const actualWidth = Math.max(element.scrollWidth, element.offsetWidth, rect.width);
+            const actualHeight = Math.max(element.scrollHeight, element.offsetHeight, rect.height);
+
+            // Add generous padding to ensure nothing is cut off
+            const exportWidth = Math.ceil(actualWidth) + 100;
+            const exportHeight = Math.ceil(actualHeight) + 100;
+
+            console.log('Dynamic export dimensions:', {
+                scrollWidth: element.scrollWidth,
+                scrollHeight: element.scrollHeight,
+                offsetWidth: element.offsetWidth,
+                offsetHeight: element.offsetHeight,
+                boundingRect: rect,
+                finalExport: `${exportWidth} x ${exportHeight}`
+            });
+
+            const canvas = await html2canvas(element, {
                 useCORS: true,
                 allowTaint: true,
-                scale: 2, // High quality
+                scale: 2, // High quality export
                 backgroundColor: '#f8fafc',
-                logging: false,
-                windowWidth: contentWidth + 100,
-                windowHeight: contentHeight + 100,
+                logging: true, // Enable logging for debugging
+                width: exportWidth,
+                height: exportHeight,
+                windowWidth: exportWidth,
+                windowHeight: exportHeight,
                 scrollX: 0,
                 scrollY: 0,
                 x: 0,
                 y: 0,
                 onclone: (clonedDoc: Document) => {
-                    const element = clonedDoc.getElementById('trip-cheatsheet-export');
-                    if (element) {
-                        element.style.display = 'flex';
-                        element.style.flexDirection = 'row';
-                        element.style.width = 'max-content';
-                        element.style.minWidth = `${contentWidth}px`;
-                        element.style.height = 'auto';
+                    const clonedElement = clonedDoc.getElementById('trip-cheatsheet-export');
+                    if (clonedElement) {
+                        // Force flex layout with explicit dimensions
+                        clonedElement.style.display = 'flex';
+                        clonedElement.style.flexDirection = 'row';
+                        clonedElement.style.flexWrap = 'nowrap';
+                        clonedElement.style.width = `${exportWidth}px`;
+                        clonedElement.style.minWidth = `${exportWidth}px`;
+                        clonedElement.style.maxWidth = 'none';
+                        clonedElement.style.height = 'auto';
+                        clonedElement.style.minHeight = `${actualHeight}px`;
+                        clonedElement.style.overflow = 'visible';
+                        clonedElement.style.transform = 'none';
+                        clonedElement.style.position = 'relative';
+
+                        // Ensure all day columns maintain their width
+                        const dayColumns = clonedElement.querySelectorAll(':scope > div');
+                        dayColumns.forEach((col) => {
+                            const htmlCol = col as HTMLElement;
+                            htmlCol.style.width = '320px';
+                            htmlCol.style.minWidth = '320px';
+                            htmlCol.style.maxWidth = '320px';
+                            htmlCol.style.flexShrink = '0';
+                            htmlCol.style.overflow = 'visible';
+                        });
 
                         // Ensure cards overflow is visible
-                        const cards = element.querySelectorAll('[class*="rounded-xl"]');
+                        const cards = clonedElement.querySelectorAll('[class*="rounded-xl"]');
                         cards.forEach((card) => {
                             const htmlCard = card as HTMLElement;
                             htmlCard.style.overflow = 'visible';
                         });
+
+                        // Ensure images are fully rendered
+                        const images = clonedElement.querySelectorAll('img, [style*="background-image"]');
+                        images.forEach((img) => {
+                            const htmlImg = img as HTMLElement;
+                            htmlImg.style.visibility = 'visible';
+                            htmlImg.style.opacity = '1';
+                        });
                     }
                 }
             });
+
+            // Restore original styles
+            element.style.overflow = originalOverflow;
+            element.style.position = originalPosition;
 
             const base64Image = canvas.toDataURL('image/png');
             setGeneratedImage(base64Image);
@@ -157,8 +210,22 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                         </div>
                     ) : (
                         <div className="inline-block min-w-full min-h-full">
-                            <div className="shadow-xl bg-slate-50 rounded-xl overflow-hidden w-fit mx-auto">
-                                <div ref={exportRef} className="bg-slate-50">
+                            <div
+                                className="shadow-xl bg-slate-50 rounded-xl w-fit"
+                                style={{
+                                    overflow: 'visible',
+                                    width: 'fit-content'
+                                }}
+                            >
+                                <div
+                                    ref={exportRef}
+                                    className="bg-slate-50"
+                                    style={{
+                                        width: 'fit-content',
+                                        minWidth: 'max-content',
+                                        overflow: 'visible'
+                                    }}
+                                >
                                     <TripCheatsheetView
                                         tripPlan={tripPlan}
                                         id="trip-cheatsheet-export"
