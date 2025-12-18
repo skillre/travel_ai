@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import puppeteer from 'puppeteer-core';
-// import { renderToStaticMarkup } from 'react-dom/server';
 import { TripPlan, TripPlanDay, TripPlanItem } from '../../types';
-import TripCheatsheetView from '../../components/TripCheatsheetView';
-import TripRouteMapView from '../../components/TripRouteMapView';
-import DayDetailExportView from '../../components/DayDetailExportView';
+import { Utensils, Camera } from 'lucide-react';
+import React from 'react';
+// Import Layout components instead of Client Views
+import TripCheatsheetLayout from '../../components/TripCheatsheetLayout';
+import TripRouteMapView from '../../components/TripRouteMapView'; // Now safe (no use client)
+import DayDetailLayout from '../../components/DayDetailLayout';
 
 // 强制使用 Node.js Runtime
 export const runtime = 'nodejs';
