@@ -2,9 +2,8 @@
 
 import { memo } from 'react';
 import Image from 'next/image';
-import { MapPin, Clock, Coins } from 'lucide-react';
 import { TripPlanItem } from '../types';
-import { useUnsplashImage } from '../hooks/useUnsplashImage';
+import { useImage } from '../hooks/useImage';
 
 interface ItemCardProps {
     item: TripPlanItem;
@@ -16,8 +15,45 @@ interface ItemCardProps {
 }
 
 /**
+ * 图片骨架屏组件
+ * 在图片加载时显示动画占位符
+ */
+function ImageSkeleton({ emoji }: { emoji: string }) {
+    return (
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 animate-pulse">
+            {/* 渐变动画背景 */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skeleton-shimmer" />
+            {/* 中心 Emoji 作为类型指示 */}
+            <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-4xl opacity-50 animate-bounce">{emoji}</span>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * 图片加载错误占位符
+ */
+function ImageErrorPlaceholder({ emoji, onRetry }: { emoji: string; onRetry?: () => void }) {
+    return (
+        <div 
+            className="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors"
+            onClick={onRetry}
+        >
+            <span className="text-3xl mb-1">{emoji}</span>
+            {onRetry && (
+                <span className="text-[10px] text-slate-400 hover:text-slate-600">
+                    点击重试
+                </span>
+            )}
+        </div>
+    );
+}
+
+/**
  * 核心卡片组件
  * 根据 type (spot/food) 差异化渲染
+ * 支持骨架屏和乐观 UI
  */
 function ItemCardComponent({
     item,
@@ -30,12 +66,17 @@ function ItemCardComponent({
     const isSpot = item.type === 'spot';
     const isFood = item.type === 'food';
 
-    // 只对景点获取 Unsplash 图片
-    const { imageUrl } = useUnsplashImage(
+    // 使用新的智能图片 Hook
+    const { imageUrl, loadingState, retry } = useImage(
         item.title,
         city,
         item.type
     );
+
+    // 如果有预解析的图片 URL（SSR），直接使用
+    const displayUrl = item.resolvedImageUrl || imageUrl;
+    const isLoading = !item.resolvedImageUrl && loadingState === 'loading';
+    const hasError = !item.resolvedImageUrl && loadingState === 'error';
 
     return (
         <div
@@ -59,21 +100,44 @@ function ItemCardComponent({
                 <div className="flex flex-col sm:flex-row h-full">
                     {/* Image Section (Fixed Width on Desktop) */}
                     <div className="relative w-full sm:w-40 h-32 sm:h-auto shrink-0 overflow-hidden sm:rounded-l-xl rounded-t-xl sm:rounded-tr-none bg-slate-50">
-                        {imageUrl ? (
+                        {/* 加载中：显示骨架屏 */}
+                        {isLoading && <ImageSkeleton emoji={item.emoji} />}
+                        
+                        {/* 加载错误：显示错误占位符 */}
+                        {hasError && !displayUrl && (
+                            <ImageErrorPlaceholder emoji={item.emoji} onRetry={retry} />
+                        )}
+                        
+                        {/* 图片加载成功 */}
+                        {displayUrl && (
                             <Image
-                                src={imageUrl}
+                                src={displayUrl}
                                 alt={item.title}
                                 fill
-                                className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                className={`
+                                    object-cover transition-all duration-700 
+                                    group-hover:scale-105
+                                    ${isLoading ? 'opacity-0' : 'opacity-100'}
+                                `}
                                 sizes="(max-width: 640px) 100vw, 160px"
+                                onError={() => {
+                                    // 图片加载失败时的处理已在 hook 中完成
+                                }}
                             />
-                        ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-3xl">
+                        )}
+                        
+                        {/* 无图片时显示 Emoji */}
+                        {!displayUrl && !isLoading && !hasError && (
+                            <div className="absolute inset-0 flex items-center justify-center text-3xl bg-gradient-to-br from-slate-50 to-slate-100">
                                 {item.emoji}
                             </div>
                         )}
+                        
                         {/* Type Badge */}
-                        <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isFood ? 'bg-white/90 text-orange-600 shadow-sm' : 'bg-white/90 text-slate-600 shadow-sm'}`}>
+                        <div className={`
+                            absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider z-10
+                            ${isFood ? 'bg-white/90 text-orange-600 shadow-sm' : 'bg-white/90 text-slate-600 shadow-sm'}
+                        `}>
                             {item.sub_title || (isFood ? 'Food' : 'Spot')}
                         </div>
                     </div>

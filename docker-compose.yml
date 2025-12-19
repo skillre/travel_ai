@@ -15,3 +15,25 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      
+      # ========== Notion 配置 ==========
+      # 通用 Notion API Key (复用)
+      - NOTION_API_KEY=${NOTION_API_KEY}
+      # 行程历史数据库 ID
+      - NOTION_DATABASE_ID=${NOTION_DATABASE_ID}
+      # 解锁码数据库 ID
+      - NOTION_UNLOCK_DATABASE_ID=${NOTION_UNLOCK_DATABASE_ID}
+      # 图片缓存数据库 ID (新增)
+      - NOTION_IMAGE_DATABASE_ID=${NOTION_IMAGE_DATABASE_ID}
+      
+      # ========== Dify 配置 ==========
+      # 行程生成工作流
+      - DIFY_API_KEY=${DIFY_API_KEY}
+      - DIFY_API_URL=${DIFY_API_URL}
+      # 图片搜索工作流 (新增)
+      - DIFY_IMAGE_API_KEY=${DIFY_IMAGE_API_KEY}
+      - DIFY_IMAGE_API_URL=${DIFY_IMAGE_API_URL}
+      
+      # ========== 其他配置 ==========
+      # Unsplash 回退配置 (可选)
+      - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}

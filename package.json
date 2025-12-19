@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@amap/amap-jsapi-loader": "^1.0.1",
+        "@notionhq/client": "^2.2.15",
         "file-saver": "^2.0.5",
         "html2canvas": "^1.4.1",
         "jszip": "^3.10.1",

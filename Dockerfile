@@ -43,14 +43,15 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Install Puppeteer dependencies and fonts (Google Noto CJK)
+# Install Puppeteer dependencies, fonts, and SSL certificates
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y wget gnupg \
+    && apt-get install -y wget gnupg ca-certificates \
     && apt-get install -y chromium \
     && apt-get install -y fonts-noto-cjk fonts-noto-color-emoji \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && update-ca-certificates
 
 
 COPY --from=builder /app/public ./public
