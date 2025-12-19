@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import { TripPlan, TripPlanItem } from '../types';
 
@@ -108,46 +108,50 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
     const containerHeight = 900;
     const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
 
-    // 1. Gather all valid spots with coordinates
-    const allSpots = useMemo(() => {
-        const spots: { item: TripPlanItem, dayIndex: number, index: number, globalIndex: number }[] = [];
-        let globalIndex = 0;
+    const allSpots: { item: TripPlanItem, dayIndex: number, index: number, globalIndex: number }[] = [];
+    let globalIndex = 0;
 
-        tripPlan.timeline.forEach((day, dayIndex) => {
-            day.items.forEach((item, index) => {
-                if ((item.type === 'spot' || item.type === 'food') &&
-                    item.location && (item.location.lat !== 0 || item.location.lng !== 0)) {
-                    spots.push({ item, dayIndex, index, globalIndex: globalIndex++ });
-                }
-            });
+    tripPlan.timeline.forEach((day, dayIndex) => {
+        day.items.forEach((item, index) => {
+            if ((item.type === 'spot' || item.type === 'food') &&
+                item.location && (item.location.lat !== 0 || item.location.lng !== 0)) {
+                allSpots.push({ item, dayIndex, index, globalIndex: globalIndex++ });
+            }
         });
-        return spots;
-    }, [tripPlan]);
+    });
 
-    // 2. Calculate Map Bounds & Parameters
-    const mapParams = useMemo(() => {
-        if (allSpots.length === 0) return null;
-        const bounds = getBounds(allSpots.map(s => s.item));
-        if (!bounds) return null;
+    const bounds = getBounds(allSpots.map(s => s.item));
+    let mapParams = null;
+    let markers: any[] = [];
 
+    // Group by day to draw day-colored paths
+    // Define type for markers
+    type MarkerType = {
+        x: number;
+        y: number;
+        item: TripPlanItem;
+        dayIndex: number;
+        index: number;
+        globalIndex: number;
+    };
+    const markersByDay: { [key: number]: MarkerType[] } = {};
+
+    let staticMapUrl = '';
+
+    if (bounds && allSpots.length > 0 && amapKey) {
         const zoom = getZoom(bounds, containerWidth, containerHeight);
         const center = getCenter(bounds);
 
         // Calculate center point in pixels to offset markers
         const centerPoint = latLngToPoint(center.lat, center.lng, zoom);
-
-        return { bounds, zoom, center, centerPoint };
-    }, [allSpots]);
-
-    // 3. Generate Marker & Path Positions
-    const { markers, paths } = useMemo(() => {
-        if (!mapParams) return { markers: [], paths: [] };
-
-        const { zoom, centerPoint } = mapParams;
         const centerXOffset = containerWidth / 2;
         const centerYOffset = containerHeight / 2;
 
-        const calculatedMarkers = allSpots.map(spot => {
+        mapParams = { bounds, zoom, center, centerPoint };
+
+        staticMapUrl = `https://restapi.amap.com/v3/staticmap?location=${center.lng.toFixed(6)},${center.lat.toFixed(6)}&zoom=${zoom}&size=1024*576&scale=2&key=${amapKey}`;
+
+        markers = allSpots.map(spot => {
             const point = latLngToPoint(spot.item.location.lat, spot.item.location.lng, zoom);
             return {
                 ...spot,
@@ -156,22 +160,11 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
             };
         });
 
-        // Group by day to draw day-colored paths
-        const markersByDay: { [key: number]: typeof calculatedMarkers } = {};
-        calculatedMarkers.forEach(m => {
+        markers.forEach(m => {
             if (!markersByDay[m.dayIndex]) markersByDay[m.dayIndex] = [];
             markersByDay[m.dayIndex].push(m);
         });
-
-        return { markers: calculatedMarkers, markersByDay };
-    }, [mapParams, allSpots]);
-
-    // 4. Construct Static Map URL
-    const staticMapUrl = useMemo(() => {
-        if (!mapParams || !amapKey) return '';
-        const { center, zoom } = mapParams;
-        return `https://restapi.amap.com/v3/staticmap?location=${center.lng.toFixed(6)},${center.lat.toFixed(6)}&zoom=${zoom}&size=1024*576&scale=2&key=${amapKey}`;
-    }, [mapParams, amapKey]);
+    }
 
     const totalDays = tripPlan.timeline.length;
 
