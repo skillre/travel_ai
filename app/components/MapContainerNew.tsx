@@ -234,7 +234,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const AMap = AMapRef.current;
 
             if (!map || !AMap || !timeline || timeline.length === 0) return;
-            if (isInitializedRef.current) return; // 防止重复绘制
+            // Removed isInitializedRef check to allow updates when timeline changes
 
             isInitializedRef.current = true;
             map.clearMap();
