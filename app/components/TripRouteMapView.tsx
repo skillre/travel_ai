@@ -1,6 +1,4 @@
-
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import { TripPlan, TripPlanItem } from '../types';
 
@@ -10,7 +8,7 @@ interface TripRouteMapViewProps {
     id?: string; // ID for html2canvas
 }
 
-// Day color configuration - matching existing color system
+// Day color configuration
 const dayColors = {
     markers: [
         { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-blue-600', lightBg: 'bg-blue-50' },
@@ -23,105 +21,157 @@ const dayColors = {
     ]
 };
 
-// Generate positions using S-shaped or Z-shaped layout algorithm
-interface NodePosition {
-    dayIndex: number;
-    itemIndex: number;
-    globalIndex: number;
-    item: TripPlanItem;
-    top: number;
-    left: number;
+// --- Map Projection Utilities ---
+
+// Constants for Web Mercator projection
+const TILE_SIZE = 256;
+
+function latLngToPoint(lat: number, lng: number, zoom: number) {
+    const scale = Math.pow(2, zoom);
+    const worldSize = TILE_SIZE * scale;
+
+    const x = ((lng + 180) / 360) * worldSize;
+
+    // Project latitude using Mercator projection formula
+    const siny = Math.min(Math.max(Math.sin((lat * Math.PI) / 180), -0.9999), 0.9999);
+    const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
+
+    return { x, y };
 }
 
-const generateNodePositions = (tripPlan: TripPlan): NodePosition[] => {
-    const positions: NodePosition[] = [];
-    const totalDays = tripPlan.timeline.length;
+interface Bounds {
+    minLng: number;
+    maxLng: number;
+    minLat: number;
+    maxLat: number;
+}
 
-    // Calculate vertical segments for each day
-    const dayHeight = 100 / totalDays; // Percentage height per day
+function getBounds(items: TripPlanItem[]): Bounds | null {
+    if (items.length === 0) return null;
 
-    let globalIndex = 0;
+    // Filter out items with 0,0 coordinates
+    const validItems = items.filter(item => item.location && (item.location.lng !== 0 || item.location.lat !== 0));
+    if (validItems.length === 0) return null;
 
-    tripPlan.timeline.forEach((day, dayIndex) => {
-        const spots = day.items.filter(item => item.type === 'spot' || item.type === 'food');
-        const itemCount = spots.length;
+    let minLng = 180;
+    let maxLng = -180;
+    let minLat = 90;
+    let maxLat = -90;
 
-        if (itemCount === 0) return;
-
-        // Vertical base position for this day
-        const dayTopBase = dayIndex * dayHeight + 5; // 5% padding from top of day section
-        const availableHeight = dayHeight - 10; // 10% padding within day section
-
-        spots.forEach((item, itemIdx) => {
-            // S-shaped layout: alternate sides
-            const isEven = itemIdx % 2 === 0;
-
-            // Horizontal position: zigzag pattern within day
-            // First item starts on left, then alternates
-            let left: number;
-            if (itemCount === 1) {
-                left = 50; // Center if only one item
-            } else {
-                left = isEven ? 20 + (itemIdx * 5) : 80 - (itemIdx * 5);
-                // Keep within bounds
-                left = Math.max(15, Math.min(85, left));
-            }
-
-            // Vertical position within day section
-            const verticalSpacing = itemCount > 1 ? availableHeight / (itemCount - 1) : 0;
-            const top = dayTopBase + (itemIdx * verticalSpacing);
-
-            positions.push({
-                dayIndex,
-                itemIndex: itemIdx,
-                globalIndex: globalIndex++,
-                item,
-                top: Math.max(3, Math.min(95, top)), // Clamp to safe bounds
-                left,
-            });
-        });
+    validItems.forEach(item => {
+        minLng = Math.min(minLng, item.location.lng);
+        maxLng = Math.max(maxLng, item.location.lng);
+        minLat = Math.min(minLat, item.location.lat);
+        maxLat = Math.max(maxLat, item.location.lat);
     });
 
-    return positions;
-};
+    return { minLng, maxLng, minLat, maxLat };
+}
 
-// Generate SVG path for connecting nodes
-const generateConnectorPath = (nodes: NodePosition[], containerWidth: number, containerHeight: number): string => {
-    if (nodes.length < 2) return '';
+function getCenter(bounds: Bounds): { lng: number, lat: number } {
+    return {
+        lng: (bounds.minLng + bounds.maxLng) / 2,
+        lat: (bounds.minLat + bounds.maxLat) / 2
+    };
+}
 
-    const points = nodes.map(node => ({
-        x: (node.left / 100) * containerWidth,
-        y: (node.top / 100) * containerHeight + 16, // Offset to center of marker
-    }));
+function getZoom(bounds: Bounds, width: number, height: number): number {
+    const WORLD_DIM = { height: 256, width: 256 };
+    const ZOOM_MAX = 17;
+    const ZOOM_MIN = 3;
+    const PADDING = 100; // Pixels padding
 
-    // Build smooth curve path
-    let path = `M ${points[0].x} ${points[0].y}`;
-
-    for (let i = 1; i < points.length; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
-
-        // Use quadratic bezier for smooth curves
-        const midX = (prev.x + curr.x) / 2;
-        const midY = (prev.y + curr.y) / 2;
-
-        // Control point for smooth S-curve effect
-        const cpX = midX;
-        const cpY = prev.y;
-
-        path += ` Q ${cpX} ${cpY} ${midX} ${midY}`;
-        path += ` Q ${midX} ${curr.y} ${curr.x} ${curr.y}`;
+    function latRad(lat: number) {
+        const sin = Math.sin(lat * Math.PI / 180);
+        const radX2 = Math.log((1 + sin) / (1 - sin)) / 2;
+        return Math.max(Math.min(radX2, Math.PI), -Math.PI) / 2;
     }
 
-    return path;
-};
+    function zoom(mapPx: number, worldPx: number, fraction: number) {
+        return Math.floor(Math.log(mapPx / worldPx / fraction) / Math.LN2);
+    }
+
+    const latFraction = (latRad(bounds.maxLat) - latRad(bounds.minLat)) / Math.PI;
+    const lngDiff = bounds.maxLng - bounds.minLng;
+    const lngFraction = ((lngDiff < 0) ? (lngDiff + 360) : lngDiff) / 360;
+
+    const latZoom = zoom(height - PADDING * 2, WORLD_DIM.height, latFraction);
+    const lngZoom = zoom(width - PADDING * 2, WORLD_DIM.width, lngFraction);
+
+    return Math.min(latZoom, lngZoom, ZOOM_MAX);
+}
+
+// -------------------------------
 
 export default function TripRouteMapView({ tripPlan, className = '', id }: TripRouteMapViewProps) {
     const containerWidth = 1600; // Wide landscape (16:9)
     const containerHeight = 900;
+    const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
 
-    const nodes = generateNodePositions(tripPlan);
-    const svgPath = generateConnectorPath(nodes, containerWidth, containerHeight);
+    // 1. Gather all valid spots with coordinates
+    const allSpots = useMemo(() => {
+        const spots: { item: TripPlanItem, dayIndex: number, index: number, globalIndex: number }[] = [];
+        let globalIndex = 0;
+
+        tripPlan.timeline.forEach((day, dayIndex) => {
+            day.items.forEach((item, index) => {
+                if ((item.type === 'spot' || item.type === 'food') &&
+                    item.location && (item.location.lat !== 0 || item.location.lng !== 0)) {
+                    spots.push({ item, dayIndex, index, globalIndex: globalIndex++ });
+                }
+            });
+        });
+        return spots;
+    }, [tripPlan]);
+
+    // 2. Calculate Map Bounds & Parameters
+    const mapParams = useMemo(() => {
+        if (allSpots.length === 0) return null;
+        const bounds = getBounds(allSpots.map(s => s.item));
+        if (!bounds) return null;
+
+        const zoom = getZoom(bounds, containerWidth, containerHeight);
+        const center = getCenter(bounds);
+
+        // Calculate center point in pixels to offset markers
+        const centerPoint = latLngToPoint(center.lat, center.lng, zoom);
+
+        return { bounds, zoom, center, centerPoint };
+    }, [allSpots]);
+
+    // 3. Generate Marker & Path Positions
+    const { markers, paths } = useMemo(() => {
+        if (!mapParams) return { markers: [], paths: [] };
+
+        const { zoom, centerPoint } = mapParams;
+        const centerXOffset = containerWidth / 2;
+        const centerYOffset = containerHeight / 2;
+
+        const calculatedMarkers = allSpots.map(spot => {
+            const point = latLngToPoint(spot.item.location.lat, spot.item.location.lng, zoom);
+            return {
+                ...spot,
+                x: point.x - centerPoint.x + centerXOffset,
+                y: point.y - centerPoint.y + centerYOffset,
+            };
+        });
+
+        // Group by day to draw day-colored paths
+        const markersByDay: { [key: number]: typeof calculatedMarkers } = {};
+        calculatedMarkers.forEach(m => {
+            if (!markersByDay[m.dayIndex]) markersByDay[m.dayIndex] = [];
+            markersByDay[m.dayIndex].push(m);
+        });
+
+        return { markers: calculatedMarkers, markersByDay };
+    }, [mapParams, allSpots]);
+
+    // 4. Construct Static Map URL
+    const staticMapUrl = useMemo(() => {
+        if (!mapParams || !amapKey) return '';
+        const { center, zoom } = mapParams;
+        return `https://restapi.amap.com/v3/staticmap?location=${center.lng.toFixed(6)},${center.lat.toFixed(6)}&zoom=${zoom}&size=1024*576&scale=2&key=${amapKey}`;
+    }, [mapParams, amapKey]);
 
     const totalDays = tripPlan.timeline.length;
 
@@ -133,35 +183,31 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
             style={{
                 width: `${containerWidth}px`,
                 height: `${containerHeight}px`,
-                backgroundColor: '#f1f5f9', // bg-slate-100
+                backgroundColor: '#f1f5f9',
                 borderRadius: '16px',
             }}
         >
-            {/* Background Decorations - City Silhouette Watermark */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.04]">
-                {/* Abstract city skyline pattern - centered and aligned to bottom */}
-                <svg className="w-full h-full" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
-                    {/* Building silhouettes at bottom - Shifted X+595, Y+820 */}
-                    <g fill="#334155">
-                        <rect x="595" y="820" width="40" height="80" />
-                        <rect x="645" y="780" width="35" height="120" />
-                        <rect x="690" y="800" width="50" height="100" />
-                        <rect x="750" y="770" width="30" height="130" />
-                        <rect x="790" y="790" width="45" height="110" />
-                        <rect x="845" y="810" width="35" height="90" />
-                        <rect x="890" y="775" width="40" height="125" />
-                        <rect x="940" y="795" width="35" height="105" />
-                        <rect x="985" y="815" width="25" height="85" />
-                    </g>
-                    {/* Geometric circles for decoration - Shifted X+125 */}
-                    <circle cx="675" cy="150" r="60" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx="925" cy="250" r="80" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                    <circle cx="775" cy="400" r="50" fill="none" stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-                </svg>
-            </div>
+            {/* Level 0: Static Map Background with Filters */}
+            {staticMapUrl ? (
+                <div className="absolute inset-0 z-0">
+                    <img
+                        src={staticMapUrl}
+                        alt="Route Map"
+                        className="w-full h-full object-cover"
+                        style={{
+                            filter: 'grayscale(100%) brightness(115%) contrast(90%) sepia(5%)',
+                            opacity: 0.9,
+                        }}
+                    />
+                </div>
+            ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-slate-400">
+                    No location data available
+                </div>
+            )}
 
             {/* Header Section */}
-            <div className="absolute top-0 left-0 right-0 p-5 z-20">
+            <div className="absolute top-0 left-0 right-0 p-5 z-30 pointer-events-none">
                 <div className="text-center">
                     <div className="inline-flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm border border-slate-200">
                         <MapPin className="w-4 h-4 text-rose-500" />
@@ -170,26 +216,19 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
                         <span className="text-sm text-slate-600">{totalDays}日路线图</span>
                     </div>
                 </div>
-                <h3 className="text-center text-sm text-slate-500 mt-2 line-clamp-1 px-4">
+                <h3 className="text-center text-sm text-slate-500 mt-2 line-clamp-1 px-4 drop-shadow-sm bg-white/50 inline-block rounded-md mx-auto">
                     {tripPlan.meta.trip_title}
                 </h3>
             </div>
 
             {/* Day Zone Labels - Left Side */}
-            <div className="absolute left-0 top-[100px] bottom-[60px] w-[40px] flex flex-col z-10">
+            <div className="absolute left-0 top-[100px] bottom-[60px] w-[40px] flex flex-col z-20 pointer-events-none">
                 {tripPlan.timeline.map((day, dayIndex) => {
                     const colors = dayColors.markers[dayIndex % dayColors.markers.length];
                     const height = `${100 / totalDays}%`;
-
                     return (
-                        <div
-                            key={day.day}
-                            className="flex items-center justify-center"
-                            style={{ height }}
-                        >
-                            <div
-                                className={`flex flex-col items-center justify-center w-8 h-14 rounded-lg ${colors.lightBg} border ${colors.border} border-opacity-30`}
-                            >
+                        <div key={day.day} className="flex items-center justify-center" style={{ height }}>
+                            <div className={`flex flex-col items-center justify-center w-8 h-14 rounded-lg bg-white/90 shadow-sm border ${colors.border} border-opacity-30`}>
                                 <span className={`text-[10px] font-medium ${colors.text} opacity-60`}>DAY</span>
                                 <span className={`text-lg font-bold ${colors.text}`}>{day.day}</span>
                             </div>
@@ -198,89 +237,65 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
                 })}
             </div>
 
-            {/* SVG Connector Lines */}
+            {/* Level 1: SVG Route Lines */}
             <svg
-                className="absolute inset-0 z-0 pointer-events-none"
-                style={{
-                    width: containerWidth,
-                    height: containerHeight,
-                    marginTop: '70px', // Offset for header
-                }}
+                className="absolute inset-0 z-10 pointer-events-none"
+                style={{ width: containerWidth, height: containerHeight }}
                 viewBox={`0 0 ${containerWidth} ${containerHeight}`}
                 xmlns="http://www.w3.org/2000/svg"
             >
-                {svgPath && (
-                    <path
-                        d={svgPath}
-                        fill="none"
-                        stroke="#94a3b8" // slate-400
-                        strokeWidth="2"
-                        strokeDasharray="6 4"
-                        strokeLinecap="round"
-                        opacity="0.6"
-                    />
-                )}
+                {tripPlan.timeline.map((day, dayIndex) => {
+                    const dayMarkerIndices = markers.filter(m => m.dayIndex === dayIndex);
+                    if (dayMarkerIndices.length < 2) return null;
 
-                {/* Directional arrows along path */}
-                {nodes.length > 1 && nodes.slice(1).map((node, idx) => {
-                    const prev = nodes[idx];
-                    const x = (node.left / 100) * containerWidth;
-                    const y = (node.top / 100) * containerHeight + 16;
-                    const prevX = (prev.left / 100) * containerWidth;
-                    const prevY = (prev.top / 100) * containerHeight + 16;
+                    let d = `M ${dayMarkerIndices[0].x} ${dayMarkerIndices[0].y}`;
+                    for (let i = 1; i < dayMarkerIndices.length; i++) {
+                        d += ` L ${dayMarkerIndices[i].x} ${dayMarkerIndices[i].y}`;
+                    }
 
-                    // Calculate angle for arrow direction
-                    const angle = Math.atan2(y - prevY, x - prevX) * (180 / Math.PI);
-                    const midX = (x + prevX) / 2;
-                    const midY = (y + prevY) / 2;
+                    const colors = dayColors.markers[dayIndex % dayColors.markers.length];
+                    const strokeColor = dayIndex === 0 ? '#ff4d4f' : // Bright Red for Day 1
+                        dayIndex === 1 ? '#fa8c16' : // Orange Day 2
+                            dayIndex === 2 ? '#52c41a' : // Green Day 3
+                                '#1677ff'; // Blue others
 
                     return (
-                        <g key={idx} transform={`translate(${midX}, ${midY}) rotate(${angle})`}>
-                            <polygon
-                                points="-4,-3 4,0 -4,3"
-                                fill="#94a3b8"
-                                opacity="0.4"
-                            />
-                        </g>
+                        <path
+                            key={day.day}
+                            d={d}
+                            fill="none"
+                            stroke={strokeColor}
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeDasharray="8 4"
+                            opacity="0.9"
+                            filter="drop-shadow(0px 1px 1px rgba(255,255,255,0.8))"
+                        />
                     );
                 })}
             </svg>
 
-            {/* Route Nodes (Markers) */}
-            <div
-                className="absolute z-10"
-                style={{
-                    left: '40px',
-                    right: '0',
-                    top: '100px',
-                    bottom: '60px',
-                }}
-            >
-                {nodes.map((node) => {
+            {/* Level 2: Markers */}
+            <div className="absolute inset-0 z-20 pointer-events-none">
+                {markers.map((node) => {
                     const colors = dayColors.markers[node.dayIndex % dayColors.markers.length];
-
-                    // Adjust positions for the inner container
-                    const containerInnerWidth = containerWidth - 40; // Subtract left day labels
-                    const leftPx = ((node.left - 15) / 70) * containerInnerWidth; // Remap 15-85% to container width
-
-                    const containerInnerHeight = containerHeight - 160; // Subtract header and footer
-                    const topPx = (node.top / 100) * containerInnerHeight;
 
                     return (
                         <div
-                            key={`${node.dayIndex}-${node.itemIndex}`}
+                            key={`${node.dayIndex}-${node.index}`}
                             className="absolute flex items-center"
                             style={{
-                                left: `${Math.max(0, Math.min(leftPx, containerInnerWidth - 150))}px`,
-                                top: `${topPx}px`,
-                                transform: 'translateY(-50%)',
+                                left: `${node.x}px`,
+                                top: `${node.y}px`,
+                                transform: 'translate(-50%, -50%)', // Center the marker on the point
                             }}
                         >
                             {/* Number Badge */}
                             <div
                                 className={`flex items-center justify-center w-8 h-8 rounded-full ${colors.bg} text-white font-bold text-sm shadow-lg border-2 border-white z-20`}
                                 style={{
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
                                 }}
                             >
                                 {node.globalIndex + 1}
@@ -288,25 +303,20 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
 
                             {/* Location Name Bubble */}
                             <div
-                                className="ml-2 px-3 py-1.5 bg-white rounded-lg shadow-md border border-slate-200 max-w-[130px]"
+                                className="absolute left-[50%] top-[-36px] -translate-x-1/2 px-3 py-1.5 bg-white/95 rounded-lg shadow-md border border-slate-200 whitespace-nowrap z-30"
                                 style={{
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                                    transform: 'translate(-50%, 0)', // Centered above
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                                 }}
                             >
                                 <div className="flex items-center gap-1">
                                     <span className="text-base">{node.item.emoji}</span>
-                                    <span
-                                        className="text-xs font-semibold text-slate-700 line-clamp-1"
-                                        style={{ maxWidth: '90px' }}
-                                    >
+                                    <span className="text-xs font-bold text-slate-800">
                                         {node.item.title}
                                     </span>
                                 </div>
-                                {node.item.type && (
-                                    <span className={`text-[10px] ${node.item.type === 'food' ? 'text-orange-500' : 'text-teal-500'}`}>
-                                        {node.item.type === 'food' ? '🍜 美食' : '📍 景点'}
-                                    </span>
-                                )}
+                                {/* Tiny triangle arrow */}
+                                <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-white/95" />
                             </div>
                         </div>
                     );
@@ -314,34 +324,34 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
             </div>
 
             {/* Footer / Legend */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
+            <div className="absolute bottom-0 left-0 right-0 p-4 z-30 bg-gradient-to-t from-white/90 to-transparent">
                 <div className="flex items-center justify-center gap-4 flex-wrap">
                     {tripPlan.timeline.map((day, idx) => {
                         const colors = dayColors.markers[idx % dayColors.markers.length];
                         const spots = day.items.filter(i => i.type === 'spot' || i.type === 'food');
+                        if (spots.length === 0) return null;
 
                         return (
-                            <div key={day.day} className="flex items-center gap-1.5">
+                            <div key={day.day} className="flex items-center gap-1.5 bg-white/80 px-2 py-1 rounded-full shadow-sm border border-slate-100">
                                 <div className={`w-3 h-3 rounded-full ${colors.bg}`}></div>
-                                <span className="text-xs text-slate-600">
-                                    Day {day.day} ({spots.length}站)
+                                <span className="text-xs text-slate-600 font-medium">
+                                    Day {day.day}
                                 </span>
                             </div>
                         );
                     })}
                 </div>
 
-                {/* Watermark */}
                 <div className="text-center mt-2">
-                    <span className="text-[10px] text-slate-400">
-                        由 AI Travel Planner 生成
+                    <span className="text-[10px] text-slate-400 font-medium tracking-wide">
+                        POWERED BY AMAP • AI TRAVEL PLANNER
                     </span>
                 </div>
             </div>
 
-            {/* Decorative compass */}
-            <div className="absolute top-[100px] right-3 w-10 h-10 opacity-30 z-10">
-                <Navigation className="w-full h-full text-slate-400" />
+            {/* Compass Decoration */}
+            <div className="absolute top-[80px] right-5 w-12 h-12 opacity-60 z-10 p-2 bg-white/50 rounded-full backdrop-blur-sm border border-white/20">
+                <Navigation className="w-full h-full text-slate-600" />
             </div>
         </div>
     );
