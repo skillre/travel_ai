@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// 全局图片缓存
-const imageCache = new Map<string, string>();
+// 请求去重（防止同一图片重复请求）
 const loadingPromises = new Map<string, Promise<ImageResult | null>>();
 
 // 图片加载状态
@@ -11,7 +10,7 @@ export type ImageLoadingState = 'idle' | 'loading' | 'loaded' | 'error';
 
 export interface ImageResult {
     url: string;
-    source: 'memory' | 'notion' | 'dify' | 'unsplash' | 'fallback';
+    source: 'notion' | 'dify' | 'unsplash' | 'fallback';
     standardizedName?: string;
     latency?: number;
 }
@@ -28,7 +27,7 @@ export interface UseImageResult {
  * 自定义 Hook: 智能图片获取
  * 
  * 特性:
- * - 多层缓存（内存 -> Notion -> Dify -> Unsplash -> 占位图）
+ * - 直接从 Notion/Dify 获取图片（无本地缓存）
  * - 乐观 UI：立即显示骨架屏，异步加载图片
  * - 自动重试机制
  * - 防止重复请求（去重）
@@ -56,14 +55,6 @@ export function useImage(
     ): Promise<ImageResult | null> => {
         const cacheKey = `${searchKeyword}:${searchCity}:${searchType}`;
 
-        // 检查本地缓存
-        if (imageCache.has(cacheKey)) {
-            return {
-                url: imageCache.get(cacheKey)!,
-                source: 'memory'
-            };
-        }
-
         // 检查是否正在加载（防止重复请求）
         if (loadingPromises.has(cacheKey)) {
             return loadingPromises.get(cacheKey)!;
@@ -82,9 +73,6 @@ export function useImage(
                 const result = await response.json();
 
                 if (result.success && result.imageUrl) {
-                    // 缓存结果
-                    imageCache.set(cacheKey, result.imageUrl);
-                    
                     return {
                         url: result.imageUrl,
                         source: result.source || 'unknown',
@@ -111,16 +99,6 @@ export function useImage(
         if (!keyword) {
             setImageUrl(null);
             setLoadingState('idle');
-            return;
-        }
-
-        const cacheKey = `${keyword}:${city}:${type}`;
-
-        // 检查本地缓存（立即返回）
-        if (imageCache.has(cacheKey)) {
-            setImageUrl(imageCache.get(cacheKey)!);
-            setSource('memory');
-            setLoadingState('loaded');
             return;
         }
 
@@ -182,7 +160,7 @@ export async function preloadImages(
 ): Promise<Map<string, string>> {
     const results = new Map<string, string>();
 
-    // 先尝试批量查询（快速路径）
+    // 先尝试批量查询（快速路径 - 只查 Notion）
     try {
         const response = await fetch('/api/image', {
             method: 'POST',
@@ -198,8 +176,6 @@ export async function preloadImages(
         if (data.success && data.results) {
             for (const result of data.results) {
                 if (result.imageUrl) {
-                    const cacheKey = `${result.name}:${city}:${items.find(i => i.title === result.name)?.type || 'spot'}`;
-                    imageCache.set(cacheKey, result.imageUrl);
                     results.set(result.name, result.imageUrl);
                 }
             }
@@ -208,18 +184,11 @@ export async function preloadImages(
         console.error('Batch preload failed:', err);
     }
 
-    // 对于未找到的项，单独请求
+    // 对于未找到的项，单独请求（会触发 Dify 工作流）
     const pendingItems = items.filter(item => !results.has(item.title));
     
     await Promise.all(
         pendingItems.map(async (item) => {
-            const cacheKey = `${item.title}:${city}:${item.type}`;
-            
-            if (imageCache.has(cacheKey)) {
-                results.set(item.title, imageCache.get(cacheKey)!);
-                return;
-            }
-
             try {
                 const params = new URLSearchParams({
                     query: item.title,
@@ -231,7 +200,6 @@ export async function preloadImages(
                 const result = await response.json();
 
                 if (result.success && result.imageUrl) {
-                    imageCache.set(cacheKey, result.imageUrl);
                     results.set(item.title, result.imageUrl);
                 }
             } catch (err) {
@@ -244,53 +212,10 @@ export async function preloadImages(
 }
 
 /**
- * 获取全局图片缓存
- * 用于在导出时同步已加载的图片 URL
+ * 清除请求去重缓存
  */
-export function getGlobalImageCache(): Map<string, string> {
-    return imageCache;
-}
-
-/**
- * 清除图片缓存
- */
-export function clearImageCache(): void {
-    imageCache.clear();
+export function clearLoadingPromises(): void {
     loadingPromises.clear();
 }
 
-/**
- * 预热缓存：从服务器获取已知图片
- */
-export async function warmupCache(
-    items: Array<{ name: string; city: string; type: 'spot' | 'food' }>
-): Promise<void> {
-    await Promise.all(
-        items.map(async (item) => {
-            const cacheKey = `${item.name}:${item.city}:${item.type}`;
-            
-            if (imageCache.has(cacheKey)) return;
-
-            try {
-                const params = new URLSearchParams({
-                    query: item.name,
-                    city: item.city,
-                    type: item.type
-                });
-
-                const response = await fetch(`/api/image?${params}`);
-                const result = await response.json();
-
-                if (result.success && result.imageUrl) {
-                    imageCache.set(cacheKey, result.imageUrl);
-                }
-            } catch (err) {
-                // 静默失败
-            }
-        })
-    );
-}
-
 export default useImage;
-
-

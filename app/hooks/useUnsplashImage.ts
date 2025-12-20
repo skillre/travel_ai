@@ -7,10 +7,10 @@
  * 新代码请直接使用 ./useImage.ts
  */
 
-import { useImage, preloadImages, getGlobalImageCache } from './useImage';
+import { useImage, preloadImages } from './useImage';
 
 // 重新导出新的 hook 和工具函数
-export { useImage, preloadImages, getGlobalImageCache };
+export { useImage, preloadImages };
 
 // 为了向后兼容，保留旧的 hook 名称
 export function useUnsplashImage(
@@ -25,6 +25,11 @@ export function useUnsplashImage(
         isLoading: loadingState === 'loading',
         error
     };
+}
+
+// 空实现，保持 API 兼容
+export function getGlobalImageCache(): Map<string, string> {
+    return new Map();
 }
 
 export default useUnsplashImage;
