@@ -181,33 +181,38 @@ export default function DayDetailLayout({
                                     <div
                                         className={`flex-1 rounded-xl overflow-hidden shadow-sm border ${isFood ? 'border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50' : 'border-slate-100 bg-white'}`}
                                     >
-                                        {/* Image (for spots only, or optionally for food) */}
-                                        {!isFood && (
-                                            <div
-                                                className="relative w-full overflow-hidden"
-                                                style={{ height: '100px' }}
-                                            >
-                                                {renderImage({
-                                                    title: item.title,
-                                                    city: meta.city,
-                                                    type: item.type as 'spot' | 'food',
-                                                    resolvedImageUrl: item.resolvedImageUrl
-                                                })}
+                                        {/* Image (for both spots and food) */}
+                                        <div
+                                            className="relative w-full overflow-hidden"
+                                            style={{ height: '100px' }}
+                                        >
+                                            {renderImage({
+                                                title: item.title,
+                                                city: meta.city,
+                                                type: item.type as 'spot' | 'food',
+                                                resolvedImageUrl: item.resolvedImageUrl
+                                            })}
 
-                                                {/* Time label badge */}
-                                                <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium rounded-full">
-                                                    {item.time_label}
-                                                </div>
-
-                                                {/* Duration badge */}
-                                                {stayDuration && (
-                                                    <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-medium rounded-full">
-                                                        <Clock size={10} />
-                                                        <span>{stayDuration}</span>
-                                                    </div>
-                                                )}
+                                            {/* Time label badge */}
+                                            <div className={`absolute top-2 left-2 px-2 py-0.5 backdrop-blur-sm text-white text-[10px] font-medium rounded-full ${isFood ? 'bg-orange-500/70' : 'bg-black/50'}`}>
+                                                {item.time_label}
                                             </div>
-                                        )}
+
+                                            {/* Duration badge */}
+                                            {stayDuration && (
+                                                <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 bg-white/90 backdrop-blur-sm text-slate-700 text-[10px] font-medium rounded-full">
+                                                    <Clock size={10} />
+                                                    <span>{stayDuration}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Food type badge */}
+                                            {isFood && (
+                                                <div className="absolute bottom-2 left-2 px-2 py-0.5 bg-orange-500/80 backdrop-blur-sm text-white text-[10px] font-bold rounded-full">
+                                                    美食
+                                                </div>
+                                            )}
+                                        </div>
 
                                         {/* Content */}
                                         <div className="p-3">
@@ -228,20 +233,6 @@ export default function DayDetailLayout({
                                                     </div>
                                                 )}
                                             </div>
-
-                                            {/* Time label for food */}
-                                            {isFood && (
-                                                <div className="flex items-center gap-1 text-orange-500 text-xs mb-2">
-                                                    <span>{item.time_label}</span>
-                                                    {stayDuration && (
-                                                        <>
-                                                            <span className="text-orange-300">·</span>
-                                                            <Clock size={10} />
-                                                            <span>{stayDuration}</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            )}
 
                                             {/* Description */}
                                             <p className="text-xs text-slate-500 leading-relaxed mb-2 line-clamp-2">
