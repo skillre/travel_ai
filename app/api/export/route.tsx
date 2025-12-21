@@ -7,6 +7,7 @@ import React from 'react';
 import TripCheatsheetLayout from '../../components/TripCheatsheetLayout';
 import TripRouteMapView from '../../components/TripRouteMapView'; // Now safe (no use client)
 import DayDetailLayout from '../../components/DayDetailLayout';
+import { queryNotionImage } from '../../lib/notion-image';
 
 // 强制使用 Node.js Runtime
 export const runtime = 'nodejs';
@@ -163,10 +164,10 @@ function generateExportHtml(type: string, tripPlan: TripPlan, dayPlan?: TripPlan
 
 // --- Image Resolution Helpers ---
 
-// Cache for server-side fetches
-const serverImageCache = new Map<string, { url: string; timestamp: number }>();
-const CACHE_TTL = 1000 * 60 * 60; // 1 hour
-
+/**
+ * 根据关键词生成一个稳定的数字种子
+ * 确保相同的景点名称总是返回相同的占位图
+ */
 function generateSeedFromQuery(query: string): number {
     let hash = 0;
     for (let i = 0; i < query.length; i++) {
@@ -177,23 +178,71 @@ function generateSeedFromQuery(query: string): number {
     return Math.abs(hash % 1000) + 1;
 }
 
+/**
+ * 生成 Picsum 占位图 URL
+ */
 function getFallbackImageUrl(query: string): string {
     const seed = generateSeedFromQuery(query);
     return `https://picsum.photos/seed/${seed}/800/600`;
 }
 
+/**
+ * 从 Unsplash 获取图片
+ */
+async function fetchFromUnsplash(
+    query: string,
+    city: string,
+    type: 'spot' | 'food',
+    accessKey: string
+): Promise<string | null> {
+    try {
+        const typeHint = type === 'food' ? 'restaurant cuisine' : 'scenery landmark';
+        const searchQuery = `${query} ${city} ${typeHint}`.trim();
+
+        const response = await fetch(
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=1&orientation=landscape`,
+            {
+                headers: { 'Authorization': `Client-ID ${accessKey}` },
+            }
+        );
+
+        if (!response.ok) {
+            console.warn(`[Export API] Unsplash API error: ${response.status}`);
+            return null;
+        }
+
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+            return data.results[0].urls.regular;
+        }
+
+        return null;
+    } catch (err) {
+        console.warn(`[Export API] Unsplash fetch error:`, err);
+        return null;
+    }
+}
+
+/**
+ * 解析 TripPlan 中所有项目的图片
+ * 
+ * 图片获取优先级（与前端展示逻辑一致，但不触发 Dify）：
+ * 1. Notion 数据库
+ * 2. Unsplash API
+ * 3. Picsum 占位图
+ */
 async function resolveImagesForTripPlan(tripPlan: TripPlan): Promise<void> {
     const accessKey = process.env.UNSPLASH_ACCESS_KEY;
 
-    // Collect all items that need images
-    const jobs: Array<{ item: TripPlanItem, query: string }> = [];
+    // 收集所有需要图片的项目
+    const jobs: Array<{ item: TripPlanItem; city: string }> = [];
 
     tripPlan.timeline.forEach(day => {
         if (!day.items) return;
         day.items.forEach(item => {
-            if (item.type === 'spot' && !item.resolvedImageUrl) {
-                const query = `${item.title} ${tripPlan.meta.city}`;
-                jobs.push({ item, query });
+            // 处理景点和美食两种类型的图片
+            if ((item.type === 'spot' || item.type === 'food') && !item.resolvedImageUrl) {
+                jobs.push({ item, city: tripPlan.meta.city });
             }
         });
     });
@@ -202,53 +251,38 @@ async function resolveImagesForTripPlan(tripPlan: TripPlan): Promise<void> {
 
     console.log(`[Export API] Resolving ${jobs.length} missing images...`);
 
-    // Process in parallel with concurrency limit (e.g., 5)
-    // For simplicity here, we just use Promise.all but Unsplash might rate limit.
-    // Since this is export, let's limit to first 10 or parallelize carefully.
+    const resolveJob = async (job: { item: TripPlanItem; city: string }) => {
+        const { item, city } = job;
 
-    const resolveJob = async (job: { item: TripPlanItem, query: string }) => {
-        const { item, query } = job;
-
-        // Check cache
-        const cached = serverImageCache.get(query);
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-            item.resolvedImageUrl = cached.url;
-            return;
-        }
-
-        if (!accessKey) {
-            item.resolvedImageUrl = getFallbackImageUrl(query);
-            return;
-        }
-
+        // ========== 第1层：Notion 数据库 ==========
         try {
-            const response = await fetch(
-                `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query + ' travel china')}&per_page=1&orientation=landscape`,
-                {
-                    headers: { 'Authorization': `Client-ID ${accessKey}` },
-                    next: { revalidate: 3600 } // Next.js fetch cache
-                }
-            );
-
-            if (!response.ok) throw new Error(`Status ${response.status}`);
-
-            const data = await response.json();
-            if (data.results && data.results.length > 0) {
-                const url = data.results[0].urls.regular;
-                item.resolvedImageUrl = url;
-                serverImageCache.set(query, { url, timestamp: Date.now() });
-            } else {
-                const fallback = getFallbackImageUrl(query);
-                item.resolvedImageUrl = fallback;
-                serverImageCache.set(query, { url: fallback, timestamp: Date.now() });
+            const notionResult = await queryNotionImage(item.title, city);
+            if (notionResult.found && notionResult.record?.imageUrl) {
+                item.resolvedImageUrl = notionResult.record.imageUrl;
+                console.log(`[Export API] Found image in Notion for: ${item.title}`);
+                return;
             }
         } catch (err) {
-            console.warn(`[Export API] Failed to fetch image for ${query}:`, err);
-            item.resolvedImageUrl = getFallbackImageUrl(query);
+            console.warn(`[Export API] Notion query failed for ${item.title}:`, err);
         }
+
+        // ========== 第2层：Unsplash API ==========
+        if (accessKey) {
+            const unsplashUrl = await fetchFromUnsplash(item.title, city, item.type, accessKey);
+            if (unsplashUrl) {
+                item.resolvedImageUrl = unsplashUrl;
+                console.log(`[Export API] Found image in Unsplash for: ${item.title}`);
+                return;
+            }
+        }
+
+        // ========== 第3层：Picsum 占位图 ==========
+        const fallbackQuery = `${item.title} ${city}`;
+        item.resolvedImageUrl = getFallbackImageUrl(fallbackQuery);
+        console.log(`[Export API] Using fallback image for: ${item.title}`);
     };
 
-    // Execute in batches to be nice to API
+    // 批量处理，每批 5 个并行请求（避免 API 限流）
     const batchSize = 5;
     for (let i = 0; i < jobs.length; i += batchSize) {
         const batch = jobs.slice(i, i + batchSize);
