@@ -1,15 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import UserAvatar from './UserAvatar';
+import { UserInfo } from '../types';
 
 interface HeaderProps {
     onSearch: (query: string) => void;
     onHistoryClick: () => void;
     isLoading: boolean;
     initialQuery?: string;
+    user?: UserInfo | null;
+    onUserClick?: () => void;
 }
 
-export default function Header({ onSearch, onHistoryClick, isLoading, initialQuery = '' }: HeaderProps) {
+export default function Header({
+    onSearch,
+    onHistoryClick,
+    isLoading,
+    initialQuery = '',
+    user,
+    onUserClick,
+}: HeaderProps) {
     const [query, setQuery] = useState(initialQuery);
     const [isFocused, setIsFocused] = useState(false);
 
@@ -38,7 +49,7 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onFocus={() => setIsFocused(true)}
-                                onBlur={() => setTimeout(() => setIsFocused(false), 200)} // Delay to allow button click
+                                onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                                 onKeyPress={handleKeyPress}
                                 placeholder={isFocused ? "输入旅行需求..." : "输入新的旅行需求..."}
                                 className="w-full pl-10 pr-4 py-2.5 bg-white/60 border border-slate-200/60 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 focus:border-tender-blue-400/50 hover:bg-white/80 transition-all text-sm shadow-inner-sm"
@@ -87,6 +98,15 @@ export default function Header({ onSearch, onHistoryClick, isLoading, initialQue
                             <span className="text-lg leading-none mb-0.5">✈️</span>
                             <span className="text-[10px] font-medium leading-none">首页</span>
                         </button>
+
+                        {/* 用户头像 */}
+                        <div className="ml-1">
+                            <UserAvatar
+                                user={user || null}
+                                onClick={onUserClick}
+                                size="md"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

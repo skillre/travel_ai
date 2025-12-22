@@ -6,8 +6,10 @@ import HeroSection from './components/HeroSection';
 import Header from './components/Header';
 import TripResults from './components/TripResults';
 import GeneratingOverlay from './components/GeneratingOverlay';
-import UnlockModal from './components/UnlockModal';
+import LoginModal from './components/LoginModal';
+import UserProfileModal from './components/UserProfileModal';
 import { TripData } from './types';
+import { useUser } from './contexts/UserContext';
 
 // 动态导入历史记录面板
 const HistoryPanel = dynamic(() => import('./components/HistoryPanel'), {
@@ -26,6 +28,8 @@ interface ProgressState {
 }
 
 export default function Home() {
+    const { user, login, logout, updateAvatar, refreshUser } = useUser();
+
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -33,7 +37,13 @@ export default function Home() {
     const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [isUnlocked, setIsUnlocked] = useState(false);
+
+    // 登录弹窗状态
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [pendingQuery, setPendingQuery] = useState<string | null>(null);
+
+    // 用户信息弹窗状态
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
     // 进度状态
     const [progressState, setProgressState] = useState<ProgressState>({
@@ -42,6 +52,28 @@ export default function Home() {
         step: 'connecting'
     });
 
+    // 处理需要登录的情况
+    const handleStartWithLogin = useCallback((inputQuery: string) => {
+        setPendingQuery(inputQuery);
+        setIsLoginModalOpen(true);
+    }, []);
+
+    // 登录成功后的处理
+    const handleLoginSuccess = useCallback(async (code: string) => {
+        const result = await login(code);
+        if (result.success && pendingQuery) {
+            // 登录成功后自动开始生成
+            setIsLoginModalOpen(false);
+            setQuery(pendingQuery);
+            // 延迟一下确保状态更新
+            setTimeout(() => {
+                handleGenerate(pendingQuery);
+            }, 100);
+            setPendingQuery(null);
+        }
+        return result;
+    }, [login, pendingQuery]);
+
     const handleGenerate = useCallback(async (overrideQuery?: string) => {
         const searchQuery = overrideQuery || query;
         if (!searchQuery.trim()) {
@@ -49,13 +81,24 @@ export default function Home() {
             return;
         }
 
+        // 检查用户是否登录
+        if (!user) {
+            handleStartWithLogin(searchQuery);
+            return;
+        }
+
+        // 检查用户是否有剩余次数（VIP 用户无限制）
+        if (user.status !== 'VIP' && user.usedCount >= user.maxLimit) {
+            setError('您的使用次数已用尽，请联系客服升级');
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
-        // 初始化状态
         setProgressState({
             progress: 0,
             message: 'AI 正在启动...',
-            step: 'connecting' // 这里的 step 只是为了兼容接口，实际展示主要靠 message
+            step: 'connecting'
         });
 
         try {
@@ -64,7 +107,10 @@ export default function Home() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ context: searchQuery }),
+                body: JSON.stringify({
+                    context: searchQuery,
+                    userId: user.id, // 传递用户ID
+                }),
             });
 
             if (!response.ok) {
@@ -86,11 +132,7 @@ export default function Home() {
                 const chunk = decoder.decode(value, { stream: true });
                 buffer += chunk;
 
-                // 处理新的协议 (PROGRESS:..., DONE:..., HEARTBEAT)
                 const lines = buffer.split('\n');
-                // 保留最后一个可能不完整的行 (如果没有换行符，全保留)
-                // 注意：如果最后一行是完整的且以\n结尾，split会产生一个空串在最后，buffer变成空串，这是对的。
-                // 如果最后一行不完整，它会留在buffer里。
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
@@ -100,11 +142,8 @@ export default function Home() {
                     if (trimmedLine.startsWith('PROGRESS:')) {
                         const message = trimmedLine.slice(9);
 
-                        // 收到新的文本，更新 loadingText，并根据新消息触发一个小进度跳跃
                         setProgressState(prev => {
                             const currentProgress = prev.progress;
-                            // 每次文案变更，进度前进一点，最大90%（留给DONE）
-                            // 简单的逻辑：步进 5-10%
                             let nextProgress = currentProgress + Math.random() * 5 + 2;
                             if (nextProgress > 90) nextProgress = 90;
 
@@ -126,7 +165,6 @@ export default function Home() {
                             step: 'finalizing'
                         }));
 
-                        // 使用 ID 获取完整行程数据
                         try {
                             const historyRes = await fetch(`/api/history/${id}`, {
                                 cache: 'no-store'
@@ -138,19 +176,18 @@ export default function Home() {
 
                             const historyResult = await historyRes.json();
                             setTripData(historyResult.data);
+
+                            // 刷新用户信息以更新使用次数
+                            await refreshUser();
                         } catch (fetchErr) {
                             console.error(fetchErr);
-                            // 如果获取失败，可能是 ID 不是 Notion Page ID 或者稍微有些延迟
-                            // 这里可以重试，或者报错。暂时报错。
                             throw new Error('获取最终行程失败，请前往历史记录查看');
                         }
 
                     } else if (trimmedLine === 'HEARTBEAT') {
-                        // 心跳不更新文案，只轻微推动进度条
                         setProgressState(prev => ({
                             ...prev,
                             progress: Math.min(prev.progress + 0.2, 95),
-                            // 保持现有 message 不变
                             message: prev.message,
                             step: prev.step
                         }));
@@ -162,7 +199,7 @@ export default function Home() {
         } finally {
             setIsLoading(false);
         }
-    }, [query]);
+    }, [query, user, handleStartWithLogin, refreshUser]);
 
     const handleSelectHistory = async (pageId: string) => {
         setIsLoadingHistory(true);
@@ -186,6 +223,15 @@ export default function Home() {
             setIsLoadingHistory(false);
         }
     };
+
+    // 处理用户头像点击
+    const handleUserClick = useCallback(() => {
+        if (user) {
+            setIsProfileModalOpen(true);
+        } else {
+            setIsLoginModalOpen(true);
+        }
+    }, [user]);
 
     return (
         <main className="min-h-screen bg-cream-50 text-slate-800 selection:bg-tender-blue-200 selection:text-slate-900 overflow-hidden relative font-sans">
@@ -214,8 +260,10 @@ export default function Home() {
                             onHistoryClick={() => setIsHistoryOpen(true)}
                             isLoading={isLoading}
                             initialQuery={query}
+                            user={user}
+                            onUserClick={handleUserClick}
                         />
-                        <div className={`flex-1 relative overflow-hidden transition-all duration-500 ${!isUnlocked ? 'blur-md pointer-events-none select-none' : ''}`}>
+                        <div className="flex-1 relative overflow-hidden">
                             <TripResults tripData={tripData} />
                         </div>
                     </>
@@ -227,6 +275,9 @@ export default function Home() {
                         }}
                         onHistoryClick={() => setIsHistoryOpen(true)}
                         isLoading={isLoading}
+                        user={user}
+                        onUserClick={handleUserClick}
+                        onStartWithLogin={handleStartWithLogin}
                     />
                 )}
             </div>
@@ -262,19 +313,34 @@ export default function Home() {
                 </div>
             )}
 
+            {/* 历史记录面板 */}
             <HistoryPanel
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}
                 onSelectRecord={handleSelectHistory}
+                userId={user?.id}
             />
 
-            {/* 解锁验证弹窗 - 仅在有行程数据且未解锁时显示 */}
-            {tripData && (
-                <UnlockModal
-                    shouldLock={!isUnlocked}
-                    onUnlocked={() => setIsUnlocked(true)}
-                    wechatName="skillre"
-                    qrCodeUrl="/qrcode.png"
+            {/* 登录弹窗 */}
+            <LoginModal
+                isOpen={isLoginModalOpen}
+                onClose={() => {
+                    setIsLoginModalOpen(false);
+                    setPendingQuery(null);
+                }}
+                onLogin={handleLoginSuccess}
+                wechatName="skillre"
+                qrCodeUrl="/qrcode.png"
+            />
+
+            {/* 用户信息弹窗 */}
+            {user && (
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                    user={user}
+                    onLogout={logout}
+                    onUpdateAvatar={updateAvatar}
                 />
             )}
         </main>

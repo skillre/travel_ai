@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Clock, ArrowRight, RefreshCw, Inbox } from 'lucide-react';
+import { X, Clock, ArrowRight, RefreshCw, Inbox, User, Globe } from 'lucide-react';
 
 interface HistoryRecord {
     id: string;
@@ -9,15 +9,18 @@ interface HistoryRecord {
     workflow_run_id: string;
     has_plan_data: boolean;
     created_time: string;
+    is_public?: boolean;
+    is_own?: boolean;
 }
 
 interface HistoryPanelProps {
     isOpen: boolean;
     onClose: () => void;
     onSelectRecord: (id: string) => void;
+    userId?: string | null; // 当前登录用户ID
 }
 
-export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: HistoryPanelProps) {
+export default function HistoryPanel({ isOpen, onClose, onSelectRecord, userId }: HistoryPanelProps) {
     const [records, setRecords] = useState<HistoryRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,14 +29,19 @@ export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: Histor
         if (isOpen) {
             fetchHistory();
         }
-    }, [isOpen]);
+    }, [isOpen, userId]);
 
     const fetchHistory = async () => {
         setIsLoading(true);
         setError(null);
 
         try {
-            const response = await fetch('/api/history', {
+            // 构建 URL，如果有 userId 则带上参数
+            const url = userId
+                ? `/api/history?userId=${encodeURIComponent(userId)}`
+                : '/api/history';
+
+            const response = await fetch(url, {
                 cache: 'no-store',
             });
             const result = await response.json();
@@ -134,9 +142,24 @@ export default function HistoryPanel({ isOpen, onClose, onSelectRecord }: Histor
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-slate-800 font-semibold truncate">
-                                                {record.title}
-                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-slate-800 font-semibold truncate">
+                                                    {record.title}
+                                                </h3>
+                                                {/* 标签：自己的记录 or 公共记录 */}
+                                                {record.is_own && (
+                                                    <span className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-tender-blue-100 text-tender-blue-600 rounded">
+                                                        <User className="w-2.5 h-2.5" />
+                                                        我的
+                                                    </span>
+                                                )}
+                                                {record.is_public && (
+                                                    <span className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500 rounded">
+                                                        <Globe className="w-2.5 h-2.5" />
+                                                        公开
+                                                    </span>
+                                                )}
+                                            </div>
                                             <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
                                                 <Clock className="w-3 h-3" />
                                                 {formatDate(record.created_time)}

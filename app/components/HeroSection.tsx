@@ -2,19 +2,36 @@
 
 import { useState } from 'react';
 import { ArrowRight, Sparkles, Map, History } from 'lucide-react';
+import UserAvatar from './UserAvatar';
+import { UserInfo } from '../types';
 
 interface HeroSectionProps {
     onSearch: (query: string) => void;
     onHistoryClick: () => void;
     isLoading: boolean;
+    user?: UserInfo | null;
+    onUserClick?: () => void;
+    onStartWithLogin?: (query: string) => void; // 需要登录时的回调
 }
 
-export default function HeroSection({ onSearch, onHistoryClick, isLoading }: HeroSectionProps) {
+export default function HeroSection({
+    onSearch,
+    onHistoryClick,
+    isLoading,
+    user,
+    onUserClick,
+    onStartWithLogin,
+}: HeroSectionProps) {
     const [query, setQuery] = useState('');
     const [isFocused, setIsFocused] = useState(false);
 
     const handleGenerate = () => {
-        if (query.trim()) {
+        if (!query.trim()) return;
+
+        // 如果用户未登录，触发登录流程
+        if (!user && onStartWithLogin) {
+            onStartWithLogin(query);
+        } else {
             onSearch(query);
         }
     };
@@ -27,6 +44,14 @@ export default function HeroSection({ onSearch, onHistoryClick, isLoading }: Her
 
     return (
         <div className="relative w-full min-h-screen md:min-h-[85vh] flex flex-col items-center justify-center text-center px-4 py-8 animate-fade-in z-20">
+            {/* 右上角用户头像 */}
+            <div className="absolute top-4 right-4 z-30">
+                <UserAvatar
+                    user={user || null}
+                    onClick={onUserClick}
+                    size="md"
+                />
+            </div>
 
             {/* 主内容容器 */}
             <div className="relative flex flex-col items-center max-w-5xl mx-auto w-full">

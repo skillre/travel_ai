@@ -9,11 +9,20 @@ interface NotionPage {
         Name?: {
             title: Array<{ plain_text: string }>;
         };
+        Title?: {
+            title: Array<{ plain_text: string }>;
+        };
         PlanJSON?: {
             rich_text: Array<{ plain_text: string }>;
         };
         workflow_run_id?: {
             rich_text: Array<{ plain_text: string }>;
+        };
+        WorkflowRunId?: {
+            rich_text: Array<{ plain_text: string }>;
+        };
+        User?: {
+            relation: Array<{ id: string }>;
         };
         Created?: {
             created_time: string;
@@ -42,6 +51,43 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // 从查询参数获取用户ID
+        const { searchParams } = new URL(request.url);
+        const userId = searchParams.get('userId');
+
+        // 构建过滤条件
+        // 如果有 userId，返回该用户的记录 + 无用户的公共记录
+        // 如果没有 userId（未登录），只返回无用户的公共记录
+        let filter: any;
+
+        if (userId) {
+            // 已登录用户：显示自己的记录 + 公共记录（User 为空）
+            filter = {
+                or: [
+                    {
+                        property: 'User',
+                        relation: {
+                            contains: userId,
+                        },
+                    },
+                    {
+                        property: 'User',
+                        relation: {
+                            is_empty: true,
+                        },
+                    },
+                ],
+            };
+        } else {
+            // 未登录用户：只显示公共记录（User 为空）
+            filter = {
+                property: 'User',
+                relation: {
+                    is_empty: true,
+                },
+            };
+        }
+
         // 查询 Notion 数据库
         const response = await fetch(
             `https://api.notion.com/v1/databases/${databaseId}/query`,
@@ -53,6 +99,7 @@ export async function GET(request: NextRequest) {
                     'Notion-Version': '2022-06-28',
                 },
                 body: JSON.stringify({
+                    filter,
                     page_size: 50,
                     sorts: [
                         {
@@ -61,7 +108,7 @@ export async function GET(request: NextRequest) {
                         },
                     ],
                 }),
-                cache: 'no-store', // 禁用 Next.js 服务端缓存
+                cache: 'no-store',
             }
         );
 
@@ -99,12 +146,18 @@ export async function GET(request: NextRequest) {
                 hasPlanData = true;
             }
 
+            // 获取关联的用户ID
+            const userRelation = page.properties.User?.relation;
+            const ownerId = userRelation && userRelation.length > 0 ? userRelation[0].id : null;
+
             return {
                 id: page.id,
                 title,
                 workflow_run_id: workflowRunId,
                 has_plan_data: hasPlanData,
                 created_time: page.created_time,
+                is_public: !ownerId, // 是否为公共记录
+                is_own: ownerId === userId, // 是否为自己的记录
             };
         });
 

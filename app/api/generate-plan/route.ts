@@ -3,6 +3,114 @@ import { NextRequest } from 'next/server';
 // 强制动态渲染
 export const dynamic = 'force-dynamic';
 
+// 扣减用户使用次数
+async function decrementUserUsage(userId: string): Promise<boolean> {
+    const notionToken = process.env.NOTION_TOKEN || process.env.NOTION_API_KEY;
+    const databaseId = process.env.NOTION_UNLOCK_DATABASE_ID;
+
+    if (!notionToken || !databaseId) {
+        console.error('Missing Notion config for user update');
+        return false;
+    }
+
+    try {
+        // 先获取用户当前信息
+        const pageResponse = await fetch(
+            `https://api.notion.com/v1/pages/${userId}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${notionToken}`,
+                    'Notion-Version': '2022-06-28',
+                },
+                cache: 'no-store',
+            }
+        );
+
+        if (!pageResponse.ok) {
+            console.error('Failed to get user page');
+            return false;
+        }
+
+        const pageData = await pageResponse.json();
+        const status = pageData.properties?.Status?.select?.name;
+        const currentUsedCount = pageData.properties?.UsedCount?.number ?? 0;
+
+        // VIP 用户不扣减
+        if (status === 'VIP') {
+            return true;
+        }
+
+        // 更新 UsedCount
+        const updateResponse = await fetch(
+            `https://api.notion.com/v1/pages/${userId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${notionToken}`,
+                    'Content-Type': 'application/json',
+                    'Notion-Version': '2022-06-28',
+                },
+                body: JSON.stringify({
+                    properties: {
+                        UsedCount: {
+                            number: currentUsedCount + 1,
+                        },
+                    },
+                }),
+                cache: 'no-store',
+            }
+        );
+
+        return updateResponse.ok;
+    } catch (error) {
+        console.error('Failed to decrement user usage:', error);
+        return false;
+    }
+}
+
+// 在旅行规划数据库中关联用户
+async function linkTripToUser(tripPageId: string, userId: string): Promise<boolean> {
+    const notionToken = process.env.NOTION_TOKEN || process.env.NOTION_API_KEY;
+
+    if (!notionToken) {
+        console.error('Missing Notion token');
+        return false;
+    }
+
+    try {
+        const updateResponse = await fetch(
+            `https://api.notion.com/v1/pages/${tripPageId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${notionToken}`,
+                    'Content-Type': 'application/json',
+                    'Notion-Version': '2022-06-28',
+                },
+                body: JSON.stringify({
+                    properties: {
+                        User: {
+                            relation: [{ id: userId }],
+                        },
+                    },
+                }),
+                cache: 'no-store',
+            }
+        );
+
+        if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            console.error('Failed to link trip to user:', errorText);
+        }
+
+        return updateResponse.ok;
+    } catch (error) {
+        console.error('Failed to link trip to user:', error);
+        return false;
+    }
+}
+
 export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
 
@@ -37,7 +145,7 @@ export async function POST(request: NextRequest) {
                 if (heartbeatTimer) clearInterval(heartbeatTimer);
                 heartbeatTimer = setInterval(() => {
                     sendToClient("HEARTBEAT\n");
-                }, 4000); // 每4秒发送一次心跳
+                }, 4000);
             };
 
             const stopHeartbeat = () => {
@@ -49,10 +157,9 @@ export async function POST(request: NextRequest) {
 
             try {
                 const body = await request.json();
-                const { context } = body;
+                const { context, userId } = body;
 
                 if (!context || typeof context !== 'string') {
-                    // 发送错误并不是这里的标准流程，前端通过 PROGRESS 显示
                     sendToClient("PROGRESS:请输入您的旅行需求\n");
                     controller.close();
                     return;
@@ -66,6 +173,14 @@ export async function POST(request: NextRequest) {
                     sendToClient("PROGRESS:系统配置错误\n");
                     controller.close();
                     return;
+                }
+
+                // 如果有用户ID，先扣减使用次数
+                if (userId) {
+                    const decremented = await decrementUserUsage(userId);
+                    if (!decremented) {
+                        console.warn('Failed to decrement user usage, but continuing...');
+                    }
                 }
 
                 startHeartbeat();
@@ -82,7 +197,7 @@ export async function POST(request: NextRequest) {
                     body: JSON.stringify({
                         inputs: { context },
                         response_mode: 'streaming',
-                        user: 'travel-ai-user',
+                        user: userId || 'travel-ai-user',
                     }),
                 });
 
@@ -110,11 +225,8 @@ export async function POST(request: NextRequest) {
                     const chunk = decoder.decode(value, { stream: true });
                     buffer += chunk;
 
-                    // 处理 Dify 的 SSE 数据
-                    // Dify 返回的数据通常是 data: {...}\n\n
-                    // 可能跨包，所以需要 buffer
                     const lines = buffer.split('\n\n');
-                    buffer = lines.pop() || ''; // 保留最后一个可能不完整的部分
+                    buffer = lines.pop() || '';
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
@@ -127,28 +239,32 @@ export async function POST(request: NextRequest) {
 
                                 if (event === 'node_started') {
                                     const nodeName = data.data?.title || '';
-                                    // 优先使用映射表，否则使用默认文案
                                     const message = NODE_MAPPING[nodeName] || "AI 正在思考中...";
                                     sendToClient(`PROGRESS:${message}\n`);
-
-                                    // 重置心跳计时器
                                     startHeartbeat();
                                 }
                                 else if (event === 'workflow_finished') {
                                     const workflowRunId = data.workflow_run_id;
+
+                                    // 如果有用户ID，尝试关联旅行记录到用户
+                                    // 注意：workflowRunId 可能不是 Notion page ID
+                                    // 需要根据实际情况处理
+                                    // 这里假设 Dify 返回的数据会写入 Notion，我们在写入后关联
+                                    if (userId && workflowRunId) {
+                                        // 延迟一下等待 Notion 写入完成
+                                        setTimeout(async () => {
+                                            // 查找对应的 Notion page 并关联用户
+                                            await linkTripByWorkflowRunId(workflowRunId, userId);
+                                        }, 2000);
+                                    }
+
                                     sendToClient(`DONE:${workflowRunId}\n`);
                                     stopHeartbeat();
                                     controller.close();
-                                    return; // 结束处理
-                                }
-                                else {
-                                    // 收到任何数据都算心跳，可以重置计时器
-                                    // startHeartbeat(); 
-                                    // 可选：如果觉得 4s 太长，也可以在这里发 HEARTBEAT
+                                    return;
                                 }
 
                             } catch (e) {
-                                // JSON 解析失败，忽略，继续处理下一个
                                 console.warn('JSON parse error:', e);
                             }
                         }
@@ -173,4 +289,54 @@ export async function POST(request: NextRequest) {
             'Connection': 'keep-alive',
         },
     });
+}
+
+// 根据 workflow_run_id 查找并关联用户
+async function linkTripByWorkflowRunId(workflowRunId: string, userId: string): Promise<boolean> {
+    const notionToken = process.env.NOTION_TOKEN || process.env.NOTION_API_KEY;
+    const databaseId = process.env.NOTION_DATABASE_ID;
+
+    if (!notionToken || !databaseId) {
+        return false;
+    }
+
+    try {
+        // 查询包含该 workflow_run_id 的页面
+        const queryResponse = await fetch(
+            `https://api.notion.com/v1/databases/${databaseId}/query`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${notionToken}`,
+                    'Content-Type': 'application/json',
+                    'Notion-Version': '2022-06-28',
+                },
+                body: JSON.stringify({
+                    filter: {
+                        property: 'workflow_run_id',
+                        rich_text: {
+                            equals: workflowRunId,
+                        },
+                    },
+                    page_size: 1,
+                }),
+                cache: 'no-store',
+            }
+        );
+
+        if (!queryResponse.ok) {
+            return false;
+        }
+
+        const queryResult = await queryResponse.json();
+        if (queryResult.results && queryResult.results.length > 0) {
+            const tripPageId = queryResult.results[0].id;
+            return await linkTripToUser(tripPageId, userId);
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Failed to link trip by workflow_run_id:', error);
+        return false;
+    }
 }

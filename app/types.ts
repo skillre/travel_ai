@@ -85,3 +85,34 @@ export type TripData = TripPlan | LegacyTripData;
 export function isNewTripPlan(data: TripData): data is TripPlan {
     return 'meta' in data && 'timeline' in data;
 }
+
+// ===========================================
+// 用户系统类型定义
+// ===========================================
+
+export type UserStatus = 'VIP' | 'Active' | 'Banned';
+
+export interface UserInfo {
+    id: string;           // Notion page ID
+    name: string;         // 用户名
+    unlockCode: string;   // 解锁码
+    status: UserStatus;   // 用户状态
+    maxLimit: number;     // 总次数
+    usedCount: number;    // 已使用次数
+    avatarUrl?: string;   // 头像 URL (来自 Notion 封面)
+}
+
+export interface LoginResponse {
+    success: boolean;
+    user?: UserInfo;
+    msg?: string;
+}
+
+export interface UserContextType {
+    user: UserInfo | null;
+    isLoading: boolean;
+    login: (code: string) => Promise<LoginResponse>;
+    logout: () => void;
+    refreshUser: () => Promise<void>;
+    updateAvatar: (file: File | string) => Promise<boolean>;
+}
