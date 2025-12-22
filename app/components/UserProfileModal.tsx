@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { X, Crown, Zap, Ban, LogOut, Link2, Upload, Check, AlertCircle } from 'lucide-react';
+import { X, Crown, Zap, Ban, LogOut, Link2, Upload, Check, AlertCircle, Copy, CheckCircle } from 'lucide-react';
 import { UserInfo } from '../types';
 
 interface UserProfileModalProps {
@@ -24,6 +24,7 @@ export default function UserProfileModal({
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadSuccess, setUploadSuccess] = useState(false);
+    const [copySuccess, setCopySuccess] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -76,6 +77,32 @@ export default function UserProfileModal({
         }
     };
 
+    // 复制用户ID到剪贴板
+    const handleCopyUserId = async () => {
+        try {
+            await navigator.clipboard.writeText(user.id);
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2000);
+        } catch (error) {
+            console.error('Failed to copy:', error);
+            // 降级方案：使用传统方法
+            const textArea = document.createElement('textarea');
+            textArea.value = user.id;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                setCopySuccess(true);
+                setTimeout(() => setCopySuccess(false), 2000);
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+            }
+            document.body.removeChild(textArea);
+        }
+    };
+
     const getStatusBadge = () => {
         switch (user.status) {
             case 'VIP':
@@ -114,23 +141,30 @@ export default function UserProfileModal({
             />
 
             {/* 弹窗内容 */}
-            <div className="relative z-10 w-full max-w-md mx-4 animate-scale-in">
+            <div 
+                className="relative z-10 w-full max-w-md mx-4 animate-scale-in"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
                     {/* 头部背景 */}
                     <div className="relative h-32 bg-gradient-to-br from-tender-blue-400 via-fresh-green-400 to-soft-pink-400">
-                        {/* 关闭按钮 */}
-                        <button
-                            onClick={onClose}
-                            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-
                         {/* 装饰元素 */}
-                        <div className="absolute inset-0 overflow-hidden">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
                             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full" />
                             <div className="absolute -bottom-20 -left-10 w-60 h-60 bg-white/10 rounded-full" />
                         </div>
+
+                        {/* 关闭按钮 - 提高z-index确保可点击 */}
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClose();
+                            }}
+                            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-colors z-50"
+                            aria-label="关闭"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
                     </div>
 
                     {/* 头像区域 */}
@@ -218,9 +252,24 @@ export default function UserProfileModal({
                         {/* 用户ID */}
                         <div className="flex items-center justify-between py-3 border-b border-slate-100">
                             <span className="text-slate-500 text-sm">用户 ID</span>
-                            <span className="text-slate-700 text-sm font-mono bg-slate-100 px-2 py-1 rounded">
-                                {user.id.substring(0, 8)}...
-                            </span>
+                            <button
+                                onClick={handleCopyUserId}
+                                className="flex items-center gap-2 text-slate-700 text-sm font-mono bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded transition-colors group relative"
+                                title="点击复制"
+                            >
+                                <span>{user.id.substring(0, 8)}...</span>
+                                {copySuccess ? (
+                                    <CheckCircle className="w-4 h-4 text-fresh-green-500" />
+                                ) : (
+                                    <Copy className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                                )}
+                                {/* 复制成功提示 */}
+                                {copySuccess && (
+                                    <span className="absolute -top-8 right-0 px-2 py-1 bg-slate-800 text-white text-xs rounded whitespace-nowrap animate-fade-in">
+                                        已复制
+                                    </span>
+                                )}
+                            </button>
                         </div>
 
                         {/* 使用次数 */}

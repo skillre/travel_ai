@@ -188,6 +188,12 @@ export async function POST(request: NextRequest) {
                 // 初始状态
                 sendToClient("PROGRESS:正在连接 AI 服务...\n");
 
+                // 构建 inputs 对象，包含 context 和 User_id（如果存在）
+                const inputs: Record<string, string> = { context };
+                if (userId) {
+                    inputs.User_id = userId;
+                }
+
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
@@ -195,7 +201,7 @@ export async function POST(request: NextRequest) {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        inputs: { context },
+                        inputs,
                         response_mode: 'streaming',
                         user: userId || 'travel-ai-user',
                     }),
