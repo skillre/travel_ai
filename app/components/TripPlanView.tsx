@@ -10,6 +10,10 @@ import PlaceDetailDrawer from './PlaceDetailDrawer';
 import MobileBottomSheet from './MobileBottomSheet';
 import DayOverviewBanner from './DayOverviewBanner';
 import TripExportModal from './TripExportModal';
+import UserAvatar from './UserAvatar';
+import { useUser } from '../contexts/UserContext';
+import UserProfileModal from './UserProfileModal';
+import LoginModal from './LoginModal';
 
 // 动态导入地图组件
 const MapContainerNew = dynamic(() => import('./MapContainerNew'), {
@@ -47,6 +51,7 @@ const dayColors = [
 ];
 
 export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
+    const { user, logout, updateAvatar, login } = useUser();
     const mapRef = useRef<MapContainerNewRef>(null);
     const timelineRef = useRef<TimelineViewRef>(null); // Ref for scrolling itinerary
     const [mapMethods, setMapMethods] = useState<MapContainerNewRef | null>(null); // 使用 state 存储地图方法
@@ -58,6 +63,18 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     // 详情抽屉状态
     const [selectedDetailItem, setSelectedDetailItem] = useState<TripPlanItem | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+    // 用户相关状态
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+    const handleUserClick = useCallback(() => {
+        if (user) {
+            setIsProfileModalOpen(true);
+        } else {
+            setIsLoginModalOpen(true);
+        }
+    }, [user]);
 
     // 移动端检测
     const [isMobile, setIsMobile] = useState(false);
@@ -207,8 +224,15 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         onSelectDay={handleSelectDay}
                     />
 
-                    {/* 移动端分享按钮 - 右上角 */}
-                    <div className="absolute top-4 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150">
+                    {/* 移动端右上角按钮组 */}
+                    <div className="absolute top-4 right-4 z-40 flex items-center gap-2 animate-in fade-in zoom-in duration-300 delay-150">
+                        {/* 用户头像 */}
+                        <UserAvatar
+                            user={user || null}
+                            onClick={handleUserClick}
+                            size="md"
+                        />
+                        {/* 分享按钮 */}
                         <button
                             onClick={() => setIsExportModalOpen(true)}
                             className="flex items-center gap-1.5 px-3 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
@@ -256,6 +280,15 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     >
                         {/* 内容区域 (包含 Header 和 Timeline，以支持整体滚动) */}
                         <div className="flex-1 overflow-y-auto relative scroll-smooth">
+                            {/* 桌面端用户头像 - 右上角 */}
+                            <div className="absolute top-4 right-4 z-50">
+                                <UserAvatar
+                                    user={user || null}
+                                    onClick={handleUserClick}
+                                    size="md"
+                                />
+                            </div>
+
                             {/* Header Canvas (Image & Title) */}
                             <div className="relative h-40 md:h-48 w-full shrink-0">
                                 {backgroundImage ? (
@@ -433,6 +466,29 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                 isOpen={isExportModalOpen}
                 onClose={() => setIsExportModalOpen(false)}
                 tripPlan={tripPlan}
+            />
+
+            {/* 用户信息弹窗 */}
+            {user && (
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                    user={user}
+                    onLogout={() => {
+                        logout();
+                        setIsProfileModalOpen(false);
+                    }}
+                    onUpdateAvatar={updateAvatar}
+                />
+            )}
+
+            {/* 登录弹窗 */}
+            <LoginModal
+                isOpen={isLoginModalOpen}
+                onClose={() => setIsLoginModalOpen(false)}
+                onLogin={login}
+                wechatName="skillre"
+                qrCodeUrl="/qrcode.png"
             />
         </div>
     );

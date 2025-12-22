@@ -1,10 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import ItineraryList from './ItineraryList';
 import { MapContainerRef } from './MapContainer';
 import { TripData, isNewTripPlan, TripPlan, LegacyTripData } from '../types';
+import UserAvatar from './UserAvatar';
+import { useUser } from '../contexts/UserContext';
+import UserProfileModal from './UserProfileModal';
+import LoginModal from './LoginModal';
 
 // 动态导入地图组件，禁用 SSR
 const MapContainer = dynamic(() => import('./MapContainer'), {
@@ -43,7 +47,20 @@ interface TripResultsProps {
  * - 旧格式 (LegacyTripData): 使用现有的 ItineraryList + MapContainer
  */
 export default function TripResults({ tripData }: TripResultsProps) {
+    const { user, logout, updateAvatar, login } = useUser();
     const mapRef = useRef<MapContainerRef>(null);
+
+    // 用户相关状态
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+    const handleUserClick = useCallback(() => {
+        if (user) {
+            setIsProfileModalOpen(true);
+        } else {
+            setIsLoginModalOpen(true);
+        }
+    }, [user]);
 
     // 处理卡片悬停 (旧版)
     const handleSpotHover = useCallback((dayIndex: number, spotIndex: number) => {
@@ -72,6 +89,14 @@ export default function TripResults({ tripData }: TripResultsProps) {
 
     return (
         <div className="flex flex-col md:flex-row h-full absolute inset-0 md:p-6 gap-4 md:gap-6 animate-fade-in-up delay-200">
+            {/* 用户头像 - 右上角 */}
+            <div className="absolute top-4 right-4 z-50 md:top-10 md:right-10">
+                <UserAvatar
+                    user={user || null}
+                    onClick={handleUserClick}
+                    size="md"
+                />
+            </div>
             {/* 行程列表区域 - 移动端下部，桌面端左侧 */}
             <div className="order-2 md:order-1 h-[50%] md:h-full md:w-[420px] lg:w-[480px] shrink-0 flex flex-col">
                 <div className="glass-card rounded-2xl md:rounded-3xl overflow-hidden flex flex-col h-full border border-white/10 shadow-2xl">
@@ -99,6 +124,29 @@ export default function TripResults({ tripData }: TripResultsProps) {
                 {/* 装饰性阴影 */}
                 <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_40px_rgba(0,0,0,0.3)] rounded-2xl md:rounded-3xl" />
             </div>
+
+            {/* 用户信息弹窗 */}
+            {user && (
+                <UserProfileModal
+                    isOpen={isProfileModalOpen}
+                    onClose={() => setIsProfileModalOpen(false)}
+                    user={user}
+                    onLogout={() => {
+                        logout();
+                        setIsProfileModalOpen(false);
+                    }}
+                    onUpdateAvatar={updateAvatar}
+                />
+            )}
+
+            {/* 登录弹窗 */}
+            <LoginModal
+                isOpen={isLoginModalOpen}
+                onClose={() => setIsLoginModalOpen(false)}
+                onLogin={login}
+                wechatName="skillre"
+                qrCodeUrl="/qrcode.png"
+            />
         </div>
     );
 }

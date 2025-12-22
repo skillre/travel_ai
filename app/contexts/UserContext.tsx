@@ -105,6 +105,23 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    // 定时刷新用户信息：每5-10分钟自动更新一次
+    useEffect(() => {
+        if (!user) return; // 未登录时不执行
+
+        // 随机5-10分钟（300000-600000ms）避免所有用户同时请求
+        const refreshInterval = 300000 + Math.random() * 300000; // 5-10分钟
+
+        const intervalId = setInterval(() => {
+            refreshUser();
+        }, refreshInterval);
+
+        // 组件卸载时清除定时器
+        return () => {
+            clearInterval(intervalId);
+        };
+    }, [user, refreshUser]);
+
     // 更新头像
     const updateAvatar = useCallback(async (fileOrUrl: File | string): Promise<boolean> => {
         if (!user) return false;
