@@ -37,3 +37,12 @@ services:
       # ========== 其他配置 ==========
       # Unsplash 回退配置 (可选)
       - UNSPLASH_ACCESS_KEY=${UNSPLASH_ACCESS_KEY}
+      
+      # ========== 阿里云 OSS 配置 (用户头像存储) ==========
+      - OSS_ACCESS_KEY_ID=${OSS_ACCESS_KEY_ID}
+      - OSS_ACCESS_KEY_SECRET=${OSS_ACCESS_KEY_SECRET}
+      - OSS_BUCKET_NAME=${OSS_BUCKET_NAME}
+      - OSS_REGION=${OSS_REGION}
+      - OSS_PUBLIC_URL=${OSS_PUBLIC_URL}
+      # OSS 内网端点 (可选)
+      - OSS_INTERNAL_ENDPOINT=${OSS_INTERNAL_ENDPOINT}
