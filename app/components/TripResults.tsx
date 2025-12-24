@@ -47,7 +47,7 @@ interface TripResultsProps {
  * - 旧格式 (LegacyTripData): 使用现有的 ItineraryList + MapContainer
  */
 export default function TripResults({ tripData }: TripResultsProps) {
-    const { user, logout, updateAvatar, login } = useUser();
+    const { user, logout, updateAvatar, updateUserName, login } = useUser();
     const mapRef = useRef<MapContainerRef>(null);
 
     // 用户相关状态
@@ -136,6 +136,7 @@ export default function TripResults({ tripData }: TripResultsProps) {
                         setIsProfileModalOpen(false);
                     }}
                     onUpdateAvatar={updateAvatar}
+                    onUpdateUserName={updateUserName}
                 />
             )}
 

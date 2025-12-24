@@ -51,7 +51,7 @@ const dayColors = [
 ];
 
 export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
-    const { user, logout, updateAvatar, login } = useUser();
+    const { user, logout, updateAvatar, updateUserName, login } = useUser();
     const mapRef = useRef<MapContainerNewRef>(null);
     const timelineRef = useRef<TimelineViewRef>(null); // Ref for scrolling itinerary
     const [mapMethods, setMapMethods] = useState<MapContainerNewRef | null>(null); // 使用 state 存储地图方法
@@ -479,6 +479,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         setIsProfileModalOpen(false);
                     }}
                     onUpdateAvatar={updateAvatar}
+                    onUpdateUserName={updateUserName}
                 />
             )}
 
