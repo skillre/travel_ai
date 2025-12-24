@@ -71,32 +71,57 @@ export default function UserProfileModal({
     };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        console.log('文件选择触发');
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file) {
+            console.log('未选择文件');
+            return;
+        }
+
+        console.log('选择的文件:', {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+        });
+
+        setUploadError(null); // 清除之前的错误
 
         // 文件大小校验（5MB）
         const maxSize = 5 * 1024 * 1024; // 5MB
         if (file.size > maxSize) {
-            setUploadError('文件大小不能超过 5MB');
+            const errorMsg = `文件大小不能超过 5MB，当前文件大小: ${(file.size / 1024 / 1024).toFixed(2)}MB`;
+            console.error(errorMsg);
+            setUploadError(errorMsg);
             return;
         }
 
         // 文件类型校验
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (!allowedTypes.includes(file.type)) {
-            setUploadError('仅支持 JPG、PNG、WEBP 格式');
+            const errorMsg = `仅支持 JPG、PNG、WEBP 格式，当前格式: ${file.type}`;
+            console.error(errorMsg);
+            setUploadError(errorMsg);
             return;
         }
+
+        console.log('文件验证通过，开始读取...');
 
         // 读取文件并显示裁剪界面
         const reader = new FileReader();
         reader.onload = (e) => {
             const imageSrc = e.target?.result as string;
+            if (!imageSrc) {
+                console.error('文件读取结果为空');
+                setUploadError('文件读取失败：结果为空');
+                return;
+            }
+            console.log('文件读取成功，显示裁剪界面');
             setSelectedImageSrc(imageSrc);
             setShowCropModal(true);
             setIsEditingAvatar(false);
         };
-        reader.onerror = () => {
+        reader.onerror = (error) => {
+            console.error('文件读取失败:', error);
             setUploadError('文件读取失败');
         };
         reader.readAsDataURL(file);
@@ -114,7 +139,10 @@ export default function UserProfileModal({
         setUploadError(null);
 
         try {
+            console.log('开始上传头像流程...');
+            
             // Step 1: 获取上传凭证
+            console.log('Step 1: 请求上传凭证...');
             const signResponse = await fetch('/api/auth/avatar/sign', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -125,13 +153,22 @@ export default function UserProfileModal({
                 }),
             });
 
-            const signData = await signResponse.json();
-
-            if (!signData.success || !signData.uploadUrl || !signData.publicUrl) {
-                throw new Error(signData.msg || '获取上传凭证失败');
+            if (!signResponse.ok) {
+                const errorText = await signResponse.text();
+                console.error('获取上传凭证失败:', signResponse.status, errorText);
+                throw new Error(`获取上传凭证失败 (${signResponse.status})`);
             }
 
-            // Step 2: 直接上传到 R2
+            const signData = await signResponse.json();
+            console.log('上传凭证响应:', signData);
+
+            if (!signData.success || !signData.uploadUrl || !signData.publicUrl) {
+                console.error('上传凭证数据不完整:', signData);
+                throw new Error(signData.msg || '获取上传凭证失败：响应数据不完整');
+            }
+
+            // Step 2: 直接上传到 OSS
+            console.log('Step 2: 上传文件到 OSS...', signData.uploadUrl);
             const uploadResponse = await fetch(signData.uploadUrl, {
                 method: 'PUT',
                 headers: {
@@ -141,10 +178,15 @@ export default function UserProfileModal({
             });
 
             if (!uploadResponse.ok) {
-                throw new Error('上传到云存储失败');
+                const errorText = await uploadResponse.text();
+                console.error('上传到 OSS 失败:', uploadResponse.status, errorText);
+                throw new Error(`上传到云存储失败 (${uploadResponse.status})`);
             }
 
+            console.log('文件上传成功');
+
             // Step 3: 同步到 Notion
+            console.log('Step 3: 同步到 Notion...', signData.publicUrl);
             const syncResponse = await fetch('/api/auth/avatar/update-notion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -154,21 +196,38 @@ export default function UserProfileModal({
                 }),
             });
 
+            if (!syncResponse.ok) {
+                const errorText = await syncResponse.text();
+                console.error('同步到 Notion 失败:', syncResponse.status, errorText);
+                throw new Error(`同步到数据库失败 (${syncResponse.status})`);
+            }
+
             const syncData = await syncResponse.json();
+            console.log('Notion 同步响应:', syncData);
 
             if (!syncData.success) {
                 throw new Error(syncData.msg || '同步到数据库失败');
             }
 
             // 更新本地缓存
+            console.log('更新本地缓存...');
             const success = await onUpdateAvatar(signData.publicUrl);
             if (success) {
+                console.log('头像更新成功');
                 setUploadSuccess(true);
                 setTimeout(() => setUploadSuccess(false), 2000);
+            } else {
+                throw new Error('更新本地缓存失败');
             }
         } catch (error) {
-            console.error('Upload avatar error:', error);
-            setUploadError(error instanceof Error ? error.message : '上传失败，请重试');
+            console.error('上传头像错误:', error);
+            const errorMessage = error instanceof Error ? error.message : '上传失败，请重试';
+            setUploadError(errorMessage);
+            // 确保错误信息能显示给用户
+            console.error('错误详情:', {
+                message: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+            });
         } finally {
             setIsUploading(false);
         }
@@ -342,7 +401,15 @@ export default function UserProfileModal({
                                 <div className="flex flex-col gap-3">
                                     {/* 文件上传按钮 */}
                                     <button
-                                        onClick={() => fileInputRef.current?.click()}
+                                        onClick={() => {
+                                            console.log('点击选择文件按钮');
+                                            if (fileInputRef.current) {
+                                                console.log('触发文件选择器');
+                                                fileInputRef.current.click();
+                                            } else {
+                                                console.error('fileInputRef.current 为空');
+                                            }
+                                        }}
                                         disabled={isUploading}
                                         className="w-full py-2.5 px-4 bg-white border-2 border-dashed border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:border-tender-blue-400 hover:text-tender-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                                     >
@@ -376,10 +443,12 @@ export default function UserProfileModal({
                                     </div>
                                 </div>
                                 {uploadError && (
-                                    <p className="text-xs text-red-500 flex items-center gap-1">
-                                        <AlertCircle className="w-3 h-3" />
-                                        {uploadError}
-                                    </p>
+                                    <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+                                        <p className="text-sm text-red-600 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                            <span>{uploadError}</span>
+                                        </p>
+                                    </div>
                                 )}
                                 {isUploading && (
                                     <p className="text-xs text-slate-500 flex items-center gap-1">

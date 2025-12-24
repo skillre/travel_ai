@@ -11,10 +11,13 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
     try {
+        console.log('[Avatar Sign] 收到请求');
         const body = await request.json();
+        console.log('[Avatar Sign] 请求参数:', { userId: body.userId, fileName: body.fileName, contentType: body.contentType });
         const { userId, fileName, contentType } = body;
 
         if (!userId || typeof userId !== 'string') {
+            console.error('[Avatar Sign] 缺少用户ID');
             return NextResponse.json(
                 { success: false, msg: '缺少用户ID' },
                 { status: 400 }
@@ -31,19 +34,46 @@ export async function POST(request: NextRequest) {
         const region = process.env.OSS_REGION;
         const publicUrl = process.env.OSS_PUBLIC_URL;
 
-        if (!accessKeyId || !accessKeySecret || !bucketName || !region || !publicUrl) {
-            console.error('Missing OSS configuration:', {
+        // 检查缺失的环境变量
+        const missingVars: string[] = [];
+        if (!accessKeyId) missingVars.push('OSS_ACCESS_KEY_ID');
+        if (!accessKeySecret) missingVars.push('OSS_ACCESS_KEY_SECRET');
+        if (!bucketName) missingVars.push('OSS_BUCKET_NAME');
+        if (!region) missingVars.push('OSS_REGION');
+        if (!publicUrl) missingVars.push('OSS_PUBLIC_URL');
+
+        if (missingVars.length > 0) {
+            const errorDetails = {
+                missing: missingVars,
                 hasAccessKey: !!accessKeyId,
                 hasSecretKey: !!accessKeySecret,
                 hasBucket: !!bucketName,
                 hasRegion: !!region,
                 hasPublicUrl: !!publicUrl,
-            });
+            };
+            console.error('[Avatar Sign] OSS 配置缺失:', errorDetails);
             return NextResponse.json(
-                { success: false, msg: '服务配置错误' },
+                { 
+                    success: false, 
+                    msg: `服务配置错误：缺少以下环境变量: ${missingVars.join(', ')}。请检查 Docker 环境变量配置。`,
+                    details: errorDetails
+                },
                 { status: 500 }
             );
         }
+
+        // 此时所有变量都已确认不为空，TypeScript 类型断言
+        const finalAccessKeyId = accessKeyId!;
+        const finalAccessKeySecret = accessKeySecret!;
+        const finalBucketName = bucketName!;
+        const finalRegion = region!;
+        const finalPublicUrl = publicUrl!;
+
+        console.log('[Avatar Sign] OSS 配置检查通过:', {
+            bucket: finalBucketName,
+            region: finalRegion,
+            publicUrl: finalPublicUrl,
+        });
 
         // 生成唯一的文件路径
         // 格式: avatars/{userId}/{timestamp}-{random}.jpg
@@ -53,52 +83,69 @@ export async function POST(request: NextRequest) {
         const objectKey = `avatars/${userId}/${timestamp}-${random}.${fileExtension}`;
 
         // 创建 OSS 客户端
+        console.log('[Avatar Sign] 创建 OSS 客户端...');
         const client = new OSS({
-            accessKeyId,
-            accessKeySecret,
-            bucket: bucketName,
-            region,
+            accessKeyId: finalAccessKeyId,
+            accessKeySecret: finalAccessKeySecret,
+            bucket: finalBucketName,
+            region: finalRegion,
             // 可选：使用内网端点加速（如果服务器在阿里云内网）
             // endpoint: process.env.OSS_INTERNAL_ENDPOINT,
         });
 
         // 生成预签名上传 URL（有效期 1 小时）
+        console.log('[Avatar Sign] 生成预签名 URL, objectKey:', objectKey);
         const uploadUrl = client.signatureUrl(objectKey, {
             method: 'PUT',
             expires: 3600, // 1 小时（秒）
             'Content-Type': contentType || 'image/jpeg',
         });
+        console.log('[Avatar Sign] 预签名 URL 生成成功');
 
         // 生成公共访问 URL
         // 如果 publicUrl 是自定义域名，直接拼接；否则使用 OSS 标准格式
-        let finalPublicUrl: string;
-        if (publicUrl.includes('aliyuncs.com') || publicUrl.startsWith('http')) {
+        let finalPublicUrlForResponse: string;
+        if (finalPublicUrl.includes('aliyuncs.com') || finalPublicUrl.startsWith('http')) {
             // 如果已经是完整 URL，直接使用；否则使用 OSS 标准格式
-            if (publicUrl.startsWith('http')) {
-                finalPublicUrl = `${publicUrl.replace(/\/$/, '')}/${objectKey}`;
+            if (finalPublicUrl.startsWith('http')) {
+                finalPublicUrlForResponse = `${finalPublicUrl.replace(/\/$/, '')}/${objectKey}`;
             } else {
                 // 标准 OSS 域名格式
-                finalPublicUrl = `https://${bucketName}.${region}.aliyuncs.com/${objectKey}`;
+                finalPublicUrlForResponse = `https://${finalBucketName}.${finalRegion}.aliyuncs.com/${objectKey}`;
             }
         } else {
             // 自定义域名
-            finalPublicUrl = `${publicUrl.replace(/\/$/, '')}/${objectKey}`;
+            finalPublicUrlForResponse = `${finalPublicUrl.replace(/\/$/, '')}/${objectKey}`;
         }
+
+        console.log('[Avatar Sign] 返回响应:', {
+            success: true,
+            objectKey,
+            publicUrl: finalPublicUrlForResponse,
+            uploadUrlLength: uploadUrl.length,
+        });
 
         return NextResponse.json(
             {
                 success: true,
                 uploadUrl,
-                publicUrl: finalPublicUrl,
+                publicUrl: finalPublicUrlForResponse,
                 objectKey,
             },
             { status: 200 }
         );
 
     } catch (error) {
-        console.error('Avatar sign API error:', error);
+        console.error('[Avatar Sign] API 错误:', error);
+        console.error('[Avatar Sign] 错误详情:', {
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+        });
         return NextResponse.json(
-            { success: false, msg: '服务器内部错误' },
+            { 
+                success: false, 
+                msg: error instanceof Error ? `服务器错误: ${error.message}` : '服务器内部错误' 
+            },
             { status: 500 }
         );
     }
