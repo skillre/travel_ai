@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { X, Crown, Zap, Ban, LogOut, Link2, Upload, Check, AlertCircle, Copy, CheckCircle } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Crown, Zap, Ban, LogOut, Link2, Upload, Check, AlertCircle, Copy, CheckCircle, Edit2, Save } from 'lucide-react';
 import { UserInfo } from '../types';
+import AvatarCropModal from './AvatarCropModal';
 
 interface UserProfileModalProps {
     isOpen: boolean;
@@ -10,6 +11,7 @@ interface UserProfileModalProps {
     user: UserInfo;
     onLogout: () => void;
     onUpdateAvatar: (fileOrUrl: File | string) => Promise<boolean>;
+    onUpdateUserName: (newName: string) => Promise<{ success: boolean; msg?: string }>;
 }
 
 export default function UserProfileModal({
@@ -18,14 +20,27 @@ export default function UserProfileModal({
     user,
     onLogout,
     onUpdateAvatar,
+    onUpdateUserName,
 }: UserProfileModalProps) {
     const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [userName, setUserName] = useState(user.name);
     const [avatarUrl, setAvatarUrl] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadSuccess, setUploadSuccess] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
+    const [nameUpdateError, setNameUpdateError] = useState<string | null>(null);
+    const [nameUpdateSuccess, setNameUpdateSuccess] = useState(false);
+    const [isUpdatingName, setIsUpdatingName] = useState(false);
+    const [showCropModal, setShowCropModal] = useState(false);
+    const [selectedImageSrc, setSelectedImageSrc] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // 同步用户名状态
+    useEffect(() => {
+        setUserName(user.name);
+    }, [user.name]);
 
     if (!isOpen) return null;
 
@@ -59,21 +74,134 @@ export default function UserProfileModal({
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // 文件大小校验（5MB）
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.size > maxSize) {
+            setUploadError('文件大小不能超过 5MB');
+            return;
+        }
+
+        // 文件类型校验
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            setUploadError('仅支持 JPG、PNG、WEBP 格式');
+            return;
+        }
+
+        // 读取文件并显示裁剪界面
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imageSrc = e.target?.result as string;
+            setSelectedImageSrc(imageSrc);
+            setShowCropModal(true);
+            setIsEditingAvatar(false);
+        };
+        reader.onerror = () => {
+            setUploadError('文件读取失败');
+        };
+        reader.readAsDataURL(file);
+
+        // 重置文件输入
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    // 处理裁剪完成后的上传
+    const handleCropComplete = async (croppedImageBlob: Blob) => {
+        setShowCropModal(false);
         setIsUploading(true);
         setUploadError(null);
 
         try {
-            const success = await onUpdateAvatar(file);
+            // Step 1: 获取上传凭证
+            const signResponse = await fetch('/api/auth/avatar/sign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    fileName: `avatar-${Date.now()}.jpg`,
+                    contentType: 'image/jpeg',
+                }),
+            });
+
+            const signData = await signResponse.json();
+
+            if (!signData.success || !signData.uploadUrl || !signData.publicUrl) {
+                throw new Error(signData.msg || '获取上传凭证失败');
+            }
+
+            // Step 2: 直接上传到 R2
+            const uploadResponse = await fetch(signData.uploadUrl, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'image/jpeg',
+                },
+                body: croppedImageBlob,
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error('上传到云存储失败');
+            }
+
+            // Step 3: 同步到 Notion
+            const syncResponse = await fetch('/api/auth/avatar/update-notion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    publicUrl: signData.publicUrl,
+                }),
+            });
+
+            const syncData = await syncResponse.json();
+
+            if (!syncData.success) {
+                throw new Error(syncData.msg || '同步到数据库失败');
+            }
+
+            // 更新本地缓存
+            const success = await onUpdateAvatar(signData.publicUrl);
             if (success) {
                 setUploadSuccess(true);
                 setTimeout(() => setUploadSuccess(false), 2000);
-            } else {
-                setUploadError('暂不支持文件上传，请使用图片链接');
             }
         } catch (error) {
-            setUploadError('上传失败，请使用图片链接');
+            console.error('Upload avatar error:', error);
+            setUploadError(error instanceof Error ? error.message : '上传失败，请重试');
         } finally {
             setIsUploading(false);
+        }
+    };
+
+    // 处理用户名更新
+    const handleUserNameSave = async () => {
+        if (!userName.trim()) {
+            setNameUpdateError('用户名不能为空');
+            return;
+        }
+
+        if (userName.trim() === user.name) {
+            setIsEditingName(false);
+            return;
+        }
+
+        setIsUpdatingName(true);
+        setNameUpdateError(null);
+
+        try {
+            const result = await onUpdateUserName(userName.trim());
+            if (result.success) {
+                setNameUpdateSuccess(true);
+                setIsEditingName(false);
+                setTimeout(() => setNameUpdateSuccess(false), 2000);
+            } else {
+                setNameUpdateError(result.msg || '更新失败，请重试');
+            }
+        } catch (error) {
+            setNameUpdateError('网络错误，请稍后重试');
+        } finally {
+            setIsUpdatingName(false);
         }
     };
 
@@ -187,7 +315,10 @@ export default function UserProfileModal({
 
                             {/* 编辑头像按钮 */}
                             <button
-                                onClick={() => setIsEditingAvatar(!isEditingAvatar)}
+                                onClick={() => {
+                                    setIsEditingAvatar(!isEditingAvatar);
+                                    setUploadError(null);
+                                }}
                                 className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-slate-600 hover:text-tender-blue-500 hover:scale-110 transition-all"
                                 title="修改头像"
                             >
@@ -208,33 +339,52 @@ export default function UserProfileModal({
                         <div className="px-6 pt-4 animate-fade-in">
                             <div className="p-4 bg-slate-50 rounded-xl space-y-3">
                                 <p className="text-sm text-slate-600 font-medium">更换头像</p>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={avatarUrl}
-                                        onChange={(e) => setAvatarUrl(e.target.value)}
-                                        placeholder="输入图片链接..."
-                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 focus:border-tender-blue-400"
-                                    />
+                                <div className="flex flex-col gap-3">
+                                    {/* 文件上传按钮 */}
                                     <button
-                                        onClick={handleAvatarUrlSubmit}
+                                        onClick={() => fileInputRef.current?.click()}
                                         disabled={isUploading}
-                                        className="px-4 py-2 bg-tender-blue-500 text-white rounded-lg text-sm font-medium hover:bg-tender-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                        className="w-full py-2.5 px-4 bg-white border-2 border-dashed border-slate-300 rounded-lg text-sm font-medium text-slate-600 hover:border-tender-blue-400 hover:text-tender-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                                     >
-                                        {isUploading ? (
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        ) : (
-                                            <>
-                                                <Link2 className="w-4 h-4" />
-                                                确定
-                                            </>
-                                        )}
+                                        <Upload className="w-4 h-4" />
+                                        选择图片 (JPG/PNG/WEBP, 最大 5MB)
                                     </button>
+
+                                    {/* URL 输入方式（保留作为备用） */}
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={avatarUrl}
+                                            onChange={(e) => setAvatarUrl(e.target.value)}
+                                            placeholder="或输入图片链接..."
+                                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 focus:border-tender-blue-400"
+                                        />
+                                        <button
+                                            onClick={handleAvatarUrlSubmit}
+                                            disabled={isUploading}
+                                            className="px-4 py-2 bg-tender-blue-500 text-white rounded-lg text-sm font-medium hover:bg-tender-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                                        >
+                                            {isUploading ? (
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Link2 className="w-4 h-4" />
+                                                    确定
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
                                 </div>
                                 {uploadError && (
                                     <p className="text-xs text-red-500 flex items-center gap-1">
                                         <AlertCircle className="w-3 h-3" />
                                         {uploadError}
+                                    </p>
+                                )}
+                                {isUploading && (
+                                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                                        <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                                        上传中...
                                     </p>
                                 )}
                             </div>
@@ -243,7 +393,74 @@ export default function UserProfileModal({
 
                     {/* 用户信息 */}
                     <div className="px-6 pt-4 pb-2 text-center">
-                        <h2 className="text-2xl font-bold text-slate-800">{user.name}</h2>
+                        <div className="flex items-center justify-center gap-2">
+                            {isEditingName ? (
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={userName}
+                                        onChange={(e) => setUserName(e.target.value)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleUserNameSave();
+                                            } else if (e.key === 'Escape') {
+                                                setUserName(user.name);
+                                                setIsEditingName(false);
+                                                setNameUpdateError(null);
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 bg-white border-2 border-tender-blue-400 rounded-lg text-2xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 text-center min-w-[200px]"
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={handleUserNameSave}
+                                        disabled={isUpdatingName}
+                                        className="w-8 h-8 rounded-lg bg-tender-blue-500 text-white hover:bg-tender-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                                        title="保存"
+                                    >
+                                        {isUpdatingName ? (
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setUserName(user.name);
+                                            setIsEditingName(false);
+                                            setNameUpdateError(null);
+                                        }}
+                                        className="w-8 h-8 rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors flex items-center justify-center"
+                                        title="取消"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <h2 className="text-2xl font-bold text-slate-800">{user.name}</h2>
+                                    <button
+                                        onClick={() => setIsEditingName(true)}
+                                        className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-tender-blue-500 transition-colors flex items-center justify-center"
+                                        title="编辑用户名"
+                                    >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                        {nameUpdateError && (
+                            <p className="mt-2 text-xs text-red-500 flex items-center justify-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {nameUpdateError}
+                            </p>
+                        )}
+                        {nameUpdateSuccess && (
+                            <p className="mt-2 text-xs text-fresh-green-500 flex items-center justify-center gap-1">
+                                <Check className="w-3 h-3" />
+                                用户名已更新
+                            </p>
+                        )}
                         <div className="mt-2">{getStatusBadge()}</div>
                     </div>
 
@@ -345,10 +562,23 @@ export default function UserProfileModal({
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
                 onChange={handleFileSelect}
                 className="hidden"
             />
+
+            {/* 头像裁剪模态框 */}
+            {showCropModal && selectedImageSrc && (
+                <AvatarCropModal
+                    isOpen={showCropModal}
+                    imageSrc={selectedImageSrc}
+                    onClose={() => {
+                        setShowCropModal(false);
+                        setSelectedImageSrc('');
+                    }}
+                    onCropComplete={handleCropComplete}
+                />
+            )}
         </div>
     );
 }

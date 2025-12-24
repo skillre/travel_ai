@@ -71,8 +71,30 @@ export default function UserAvatar({ user, onClick, size = 'md' }: UserAvatarPro
         );
     }
 
-    // 无头像或加载失败，显示首字母
-    const initial = user.name.charAt(0).toUpperCase();
+    // 无头像或加载失败，显示首字符（优先显示姓氏）
+    // 获取姓氏或昵称首字符
+    const getInitial = (name: string): string => {
+        // 尝试提取姓氏（中文姓名通常姓氏在前，单个字符或两个字符）
+        // 对于中文：如果包含空格或逗号，取第一个部分；否则取第一个字符
+        // 对于英文：取第一个单词的首字母
+        const trimmed = name.trim();
+        
+        // 如果包含空格，可能是英文名字，取第一个单词
+        if (trimmed.includes(' ')) {
+            return trimmed.split(' ')[0].charAt(0).toUpperCase();
+        }
+        
+        // 如果包含逗号，取逗号后的部分（英文姓名格式：Last, First）
+        if (trimmed.includes(',')) {
+            const parts = trimmed.split(',');
+            return parts[0].trim().charAt(0).toUpperCase();
+        }
+        
+        // 中文姓名或单字名，直接取第一个字符
+        return trimmed.charAt(0).toUpperCase();
+    };
+    
+    const initial = getInitial(user.name);
     const bgColors = [
         'from-tender-blue-400 to-tender-blue-500',
         'from-fresh-green-400 to-fresh-green-500',

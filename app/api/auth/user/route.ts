@@ -113,11 +113,16 @@ export async function POST(request: NextRequest) {
 
         // 提取用户信息
         const nameProp = page.properties.Name as NotionTitleProperty | undefined;
+        const userNameProp = page.properties.user_name as NotionRichTextProperty | undefined;
         const statusProp = page.properties.Status as NotionSelectProperty | undefined;
         const usedCountProp = page.properties.UsedCount as NotionNumberProperty | undefined;
         const maxLimitProp = page.properties.MaxLimit as NotionNumberProperty | undefined;
 
-        const name = nameProp?.title?.[0]?.plain_text || '旅行者';
+        // 优先使用 user_name 字段，如果为空则使用 Name 字段，最后默认"旅行者"
+        const userName = userNameProp?.rich_text?.[0]?.plain_text;
+        const nameFromTitle = nameProp?.title?.[0]?.plain_text;
+        const name = userName || nameFromTitle || '旅行者';
+        
         const status = (statusProp?.select?.name as 'VIP' | 'Active' | 'Banned') || 'Active';
         const usedCount = usedCountProp?.number ?? 0;
         const maxLimit = maxLimitProp?.number ?? 10;

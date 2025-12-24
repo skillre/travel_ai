@@ -28,7 +28,7 @@ interface ProgressState {
 }
 
 export default function Home() {
-    const { user, login, logout, updateAvatar, refreshUser } = useUser();
+    const { user, login, logout, updateAvatar, updateUserName, refreshUser } = useUser();
 
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -224,14 +224,16 @@ export default function Home() {
         }
     };
 
-    // 处理用户头像点击
-    const handleUserClick = useCallback(() => {
+    // 处理用户头像点击（触发同步）
+    const handleUserClick = useCallback(async () => {
         if (user) {
             setIsProfileModalOpen(true);
+            // 触发同步：点击头像时同步用户信息
+            await refreshUser();
         } else {
             setIsLoginModalOpen(true);
         }
-    }, [user]);
+    }, [user, refreshUser]);
 
     return (
         <main className="min-h-screen bg-cream-50 text-slate-800 selection:bg-tender-blue-200 selection:text-slate-900 overflow-hidden relative font-sans">
@@ -341,6 +343,7 @@ export default function Home() {
                     user={user}
                     onLogout={logout}
                     onUpdateAvatar={updateAvatar}
+                    onUpdateUserName={updateUserName}
                 />
             )}
         </main>

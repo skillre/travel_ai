@@ -47,7 +47,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         initUser();
     }, []);
 
-    // 登录
+    // 登录（触发用户信息同步）
     const login = useCallback(async (code: string): Promise<LoginResponse> => {
         try {
             const response = await fetch('/api/auth/login', {
@@ -63,6 +63,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 // 保存 code 和用户信息
                 localStorage.setItem(CODE_STORAGE_KEY, code.trim());
                 localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+                // 触发同步：重新登录时同步用户信息
+                await refreshUser();
             }
 
             return data;
@@ -70,18 +72,19 @@ export function UserProvider({ children }: { children: ReactNode }) {
             console.error('Login error:', error);
             return { success: false, msg: '网络错误，请稍后重试' };
         }
-    }, []);
+    }, [refreshUser]);
 
-    // 登出
+    // 登出（清除缓存）
     const logout = useCallback(() => {
         setUser(null);
         localStorage.removeItem(CODE_STORAGE_KEY);
         localStorage.removeItem(USER_STORAGE_KEY);
-        // 同时清除旧的解锁状态
+        // 同时清除旧的解锁状态和头像缓存
         localStorage.removeItem('is_unlocked');
+        // 清除头像缓存（通过清除用户信息已包含，但明确说明）
     }, []);
 
-    // 刷新用户信息
+    // 刷新用户信息（触发式同步，不再定时）
     const refreshUser = useCallback(async () => {
         const savedCode = localStorage.getItem(CODE_STORAGE_KEY);
         if (!savedCode) return;
@@ -105,24 +108,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    // 定时刷新用户信息：每5-10分钟自动更新一次
-    useEffect(() => {
-        if (!user) return; // 未登录时不执行
-
-        // 随机5-10分钟（300000-600000ms）避免所有用户同时请求
-        const refreshInterval = 300000 + Math.random() * 300000; // 5-10分钟
-
-        const intervalId = setInterval(() => {
-            refreshUser();
-        }, refreshInterval);
-
-        // 组件卸载时清除定时器
-        return () => {
-            clearInterval(intervalId);
-        };
-    }, [user, refreshUser]);
-
-    // 更新头像
+    // 更新头像（触发用户信息同步）
     const updateAvatar = useCallback(async (fileOrUrl: File | string): Promise<boolean> => {
         if (!user) return false;
 
@@ -148,6 +134,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
                 if (data.success) {
                     // 更新本地用户信息
                     setUser(prev => prev ? { ...prev, avatarUrl: data.avatarUrl } : null);
+                    // 触发同步：更新头像后同步用户信息
+                    await refreshUser();
                     return true;
                 }
             }
@@ -156,10 +144,48 @@ export function UserProvider({ children }: { children: ReactNode }) {
             console.error('Failed to update avatar:', error);
             return false;
         }
-    }, [user]);
+    }, [user, refreshUser]);
+
+    // 更新用户名（触发用户信息同步）
+    const updateUserName = useCallback(async (newName: string): Promise<{ success: boolean; msg?: string }> => {
+        if (!user) {
+            return { success: false, msg: '用户未登录' };
+        }
+
+        if (!newName || typeof newName !== 'string' || newName.trim() === '') {
+            return { success: false, msg: '用户名不能为空' };
+        }
+
+        try {
+            const response = await fetch('/api/auth/user/update-name', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    userName: newName.trim(),
+                }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // 更新本地用户信息
+                setUser(prev => prev ? { ...prev, name: newName.trim() } : null);
+                localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ ...user, name: newName.trim() }));
+                // 触发同步：更新用户名后同步用户信息
+                await refreshUser();
+                return { success: true };
+            } else {
+                return { success: false, msg: data.msg || '更新失败，请重试' };
+            }
+        } catch (error) {
+            console.error('Failed to update user name:', error);
+            return { success: false, msg: '网络错误，请稍后重试' };
+        }
+    }, [user, refreshUser]);
 
     return (
-        <UserContext.Provider value={{ user, isLoading, login, logout, refreshUser, updateAvatar }}>
+        <UserContext.Provider value={{ user, isLoading, login, logout, refreshUser, updateAvatar, updateUserName }}>
             {children}
         </UserContext.Provider>
     );

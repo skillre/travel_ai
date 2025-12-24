@@ -115,4 +115,5 @@ export interface UserContextType {
     logout: () => void;
     refreshUser: () => Promise<void>;
     updateAvatar: (file: File | string) => Promise<boolean>;
+    updateUserName: (newName: string) => Promise<{ success: boolean; msg?: string }>;
 }
