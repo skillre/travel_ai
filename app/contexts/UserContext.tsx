@@ -47,6 +47,30 @@ export function UserProvider({ children }: { children: ReactNode }) {
         initUser();
     }, []);
 
+    // 刷新用户信息（触发式同步，不再定时）
+    const refreshUser = useCallback(async () => {
+        const savedCode = localStorage.getItem(CODE_STORAGE_KEY);
+        if (!savedCode) return;
+
+        try {
+            const response = await fetch('/api/auth/user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: savedCode }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.user) {
+                    setUser(data.user);
+                    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
+                }
+            }
+        } catch (error) {
+            console.error('Failed to refresh user:', error);
+        }
+    }, []);
+
     // 登录（触发用户信息同步）
     const login = useCallback(async (code: string): Promise<LoginResponse> => {
         try {
@@ -82,30 +106,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
         // 同时清除旧的解锁状态和头像缓存
         localStorage.removeItem('is_unlocked');
         // 清除头像缓存（通过清除用户信息已包含，但明确说明）
-    }, []);
-
-    // 刷新用户信息（触发式同步，不再定时）
-    const refreshUser = useCallback(async () => {
-        const savedCode = localStorage.getItem(CODE_STORAGE_KEY);
-        if (!savedCode) return;
-
-        try {
-            const response = await fetch('/api/auth/user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: savedCode }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.user) {
-                    setUser(data.user);
-                    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data.user));
-                }
-            }
-        } catch (error) {
-            console.error('Failed to refresh user:', error);
-        }
     }, []);
 
     // 更新头像（触发用户信息同步）
