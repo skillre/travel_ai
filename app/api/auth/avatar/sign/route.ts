@@ -12,6 +12,15 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
     try {
         console.log('[Avatar Sign] 收到请求');
+        
+        // 调试：检查所有 OSS 相关的环境变量
+        const allEnvKeys = Object.keys(process.env).filter(k => k.includes('OSS') || k.includes('oss'));
+        console.log('[Avatar Sign] 所有包含 OSS 的环境变量键:', allEnvKeys);
+        allEnvKeys.forEach(key => {
+            const value = process.env[key];
+            console.log(`[Avatar Sign] ${key}:`, value ? `${value.substring(0, 10)}... (length: ${value.length})` : 'undefined');
+        });
+        
         const body = await request.json();
         console.log('[Avatar Sign] 请求参数:', { userId: body.userId, fileName: body.fileName, contentType: body.contentType });
         const { userId, fileName, contentType } = body;
@@ -31,8 +40,24 @@ export async function POST(request: NextRequest) {
         const accessKeyId = process.env.OSS_ACCESS_KEY_ID;
         const accessKeySecret = process.env.OSS_ACCESS_KEY_SECRET;
         const bucketName = process.env.OSS_BUCKET_NAME;
-        const region = process.env.OSS_REGION;
+        let region = process.env.OSS_REGION;
         const publicUrl = process.env.OSS_PUBLIC_URL;
+        
+        // 调试：打印所有环境变量的实际值（隐藏敏感信息）
+        console.log('[Avatar Sign] 环境变量读取结果:', {
+            'OSS_ACCESS_KEY_ID': accessKeyId ? `${accessKeyId.substring(0, 4)}...(${accessKeyId.length})` : 'undefined/null/empty',
+            'OSS_ACCESS_KEY_SECRET': accessKeySecret ? `***(${accessKeySecret.length})` : 'undefined/null/empty',
+            'OSS_BUCKET_NAME': bucketName || 'undefined/null/empty',
+            'OSS_REGION': region || 'undefined/null/empty',
+            'OSS_PUBLIC_URL': publicUrl || 'undefined/null/empty',
+        });
+        
+        // 修复 region 格式（如果包含 .aliyuncs.com，提取区域部分）
+        if (region && region.includes('.aliyuncs.com')) {
+            const originalRegion = region;
+            region = region.split('.')[0];
+            console.log('[Avatar Sign] 修复 OSS_REGION 格式:', { original: originalRegion, fixed: region });
+        }
 
         // 检查缺失的环境变量
         const missingVars: string[] = [];
