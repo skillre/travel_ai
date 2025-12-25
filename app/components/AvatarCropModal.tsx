@@ -79,65 +79,125 @@ export default function AvatarCropModal({
         flip = { horizontal: false, vertical: false }
     ): Promise<Blob> => {
         const image = await createImage(imageSrc);
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-            throw new Error('无法创建 Canvas 上下文');
-        }
-
         const rotRad = getRadianAngle(rotation);
 
-        // 计算旋转后的边界框
+        // 计算旋转后的边界框尺寸
         const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
             image.width,
             image.height,
             rotation
         );
 
-        // 设置 canvas 尺寸为最终裁剪尺寸
-        canvas.width = pixelCrop.width;
-        canvas.height = pixelCrop.height;
+        // 创建用于旋转的 canvas
+        const rotCanvas = document.createElement('canvas');
+        rotCanvas.width = bBoxWidth;
+        rotCanvas.height = bBoxHeight;
+        const rotCtx = rotCanvas.getContext('2d');
 
-        // 移动 canvas 上下文到中心
-        ctx.translate(pixelCrop.width / 2, pixelCrop.height / 2);
-        ctx.rotate(rotRad);
-        ctx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
-        ctx.translate(-image.width / 2, -image.height / 2);
-
-        // 绘制图片
-        ctx.drawImage(
-            image,
-            0,
-            0
-        );
-
-        // 裁剪并获取结果
-        const croppedCanvas = document.createElement('canvas');
-        const croppedCtx = croppedCanvas.getContext('2d');
-
-        if (!croppedCtx) {
-            throw new Error('无法创建裁剪 Canvas 上下文');
+        if (!rotCtx) {
+            throw new Error('无法创建旋转 Canvas 上下文');
         }
 
-        croppedCanvas.width = pixelCrop.width;
-        croppedCanvas.height = pixelCrop.height;
+        // 移动到中心点
+        rotCtx.translate(bBoxWidth / 2, bBoxHeight / 2);
+        // 应用旋转
+        rotCtx.rotate(rotRad);
+        // 应用翻转
+        rotCtx.scale(flip.horizontal ? -1 : 1, flip.vertical ? -1 : 1);
+        // 绘制图片（从中心绘制）
+        rotCtx.drawImage(image, -image.width / 2, -image.height / 2);
 
-        croppedCtx.drawImage(
-            canvas,
-            pixelCrop.x,
-            pixelCrop.y,
-            pixelCrop.width,
-            pixelCrop.height,
-            0,
-            0,
-            pixelCrop.width,
-            pixelCrop.height
-        );
+        // 计算裁剪区域在旋转后 canvas 中的位置
+        // pixelCrop 是相对于原始图片的坐标，需要转换到旋转后的坐标系
+        const imageCenterX = image.width / 2;
+        const imageCenterY = image.height / 2;
+        const cropCenterX = pixelCrop.x + pixelCrop.width / 2;
+        const cropCenterY = pixelCrop.y + pixelCrop.height / 2;
 
-        // 转换为 Blob (JPEG 格式，质量 0.9，1:1 比例)
+        // 调试日志
+        console.log('裁剪参数:', {
+            imageSize: { width: image.width, height: image.height },
+            pixelCrop,
+            rotation,
+            bBoxSize: { width: bBoxWidth, height: bBoxHeight },
+            cropCenter: { x: cropCenterX, y: cropCenterY },
+            imageCenter: { x: imageCenterX, y: imageCenterY },
+        });
+
+        // 裁剪中心相对于图片中心的偏移
+        const offsetX = cropCenterX - imageCenterX;
+        const offsetY = cropCenterY - imageCenterY;
+
+        // 旋转这个偏移量（注意：因为图片顺时针旋转了 rotation，偏移量需要逆时针旋转）
+        const cos = Math.cos(-rotRad);
+        const sin = Math.sin(-rotRad);
+        const rotatedOffsetX = offsetX * cos - offsetY * sin;
+        const rotatedOffsetY = offsetX * sin + offsetY * cos;
+
+        // 在旋转后的 canvas 中，裁剪区域中心的位置
+        const canvasCropCenterX = bBoxWidth / 2 + rotatedOffsetX;
+        const canvasCropCenterY = bBoxHeight / 2 + rotatedOffsetY;
+
+        // 裁剪区域左上角的位置
+        const canvasCropX = canvasCropCenterX - pixelCrop.width / 2;
+        const canvasCropY = canvasCropCenterY - pixelCrop.height / 2;
+
+        // 创建最终输出的 canvas（1:1 正方形）
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = pixelCrop.width;
+        outputCanvas.height = pixelCrop.height;
+        const outputCtx = outputCanvas.getContext('2d');
+
+        if (!outputCtx) {
+            throw new Error('无法创建输出 Canvas 上下文');
+        }
+
+        // 填充白色背景（防止透明区域）
+        outputCtx.fillStyle = '#FFFFFF';
+        outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+        // 从旋转后的 canvas 中提取裁剪区域
+        // 计算实际可用的源区域（确保不超出 canvas 边界）
+        const sourceX = Math.max(0, Math.floor(canvasCropX));
+        const sourceY = Math.max(0, Math.floor(canvasCropY));
+        const maxSourceX = Math.min(rotCanvas.width, Math.floor(canvasCropX + pixelCrop.width));
+        const maxSourceY = Math.min(rotCanvas.height, Math.floor(canvasCropY + pixelCrop.height));
+        const sourceWidth = Math.max(0, maxSourceX - sourceX);
+        const sourceHeight = Math.max(0, maxSourceY - sourceY);
+
+        // 计算目标位置（如果源位置被裁剪了，调整目标位置以保持对齐）
+        const destX = sourceX > canvasCropX ? sourceX - canvasCropX : 0;
+        const destY = sourceY > canvasCropY ? sourceY - canvasCropY : 0;
+
+        // 调试日志
+        console.log('裁剪区域计算:', {
+            canvasCrop: { x: canvasCropX, y: canvasCropY },
+            source: { x: sourceX, y: sourceY, width: sourceWidth, height: sourceHeight },
+            dest: { x: destX, y: destY },
+            rotCanvasSize: { width: rotCanvas.width, height: rotCanvas.height },
+            outputSize: { width: outputCanvas.width, height: outputCanvas.height },
+        });
+
+        // 从旋转后的 canvas 提取裁剪区域到输出 canvas
+        if (sourceWidth > 0 && sourceHeight > 0) {
+            outputCtx.drawImage(
+                rotCanvas,
+                sourceX,
+                sourceY,
+                sourceWidth,
+                sourceHeight,
+                destX,
+                destY,
+                sourceWidth,
+                sourceHeight
+            );
+        } else {
+            console.error('裁剪区域无效:', { sourceWidth, sourceHeight });
+        }
+
+        // 转换为 Blob (JPEG 格式，质量 0.9)
         return new Promise((resolve, reject) => {
-            croppedCanvas.toBlob(
+            outputCanvas.toBlob(
                 (blob) => {
                     if (blob) {
                         resolve(blob);
