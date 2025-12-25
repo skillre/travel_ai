@@ -186,9 +186,12 @@ export default function UserProfileModal({
                 console.log('文件上传成功');
             } catch (uploadError) {
                 // 检查是否是 CORS 错误
-                if (uploadError instanceof TypeError && uploadError.message.includes('Failed to fetch') || uploadError.message.includes('Load failed')) {
-                    console.error('CORS 错误：OSS bucket 可能未正确配置 CORS 规则');
-                    throw new Error('上传失败：请检查 OSS bucket 的 CORS 配置。需要在 OSS 控制台配置允许跨域请求。');
+                if (uploadError instanceof TypeError || uploadError instanceof Error) {
+                    const errorMessage = uploadError.message || String(uploadError);
+                    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Load failed') || errorMessage.includes('access control checks')) {
+                        console.error('CORS 错误：OSS bucket 可能未正确配置 CORS 规则');
+                        throw new Error('上传失败：请检查 OSS bucket 的 CORS 配置。需要在 OSS 控制台配置允许跨域请求。');
+                    }
                 }
                 throw uploadError;
             }
