@@ -56,9 +56,17 @@ export async function POST(request: NextRequest) {
                         },
                     },
                     properties: {
-                        // 更新 Sculpture_head 字段（如果存在）
+                        // 更新 Sculpture_head 字段（Files 类型，格式必须严格如下）
                         Sculpture_head: {
-                            url: publicUrl,
+                            files: [
+                                {
+                                    name: 'avatar.jpg', // 显示文件名
+                                    type: 'external',   // 必须填 external
+                                    external: {
+                                        url: publicUrl  // 阿里云 OSS 的 HTTPS 链接
+                                    }
+                                }
+                            ]
                         },
                     },
                 }),
@@ -74,11 +82,17 @@ export async function POST(request: NextRequest) {
             try {
                 const errorData = JSON.parse(errorText);
                 const errorMessage = errorData.message || '更新失败';
+                console.error('[Avatar Update Notion] 错误详情:', {
+                    status: updateResponse.status,
+                    code: errorData.code,
+                    message: errorMessage,
+                });
                 
-                // 检查是否是字段不存在（Sculpture_head 字段可能不存在，这是可选的）
-                if (errorMessage.includes('Sculpture_head') && errorMessage.includes('not found')) {
-                    // 如果 Sculpture_head 字段不存在，只更新 Cover
-                    console.warn('Sculpture_head field not found, only updating Cover');
+                // 检查是否是字段不存在或格式错误（Sculpture_head 字段可能不存在，这是可选的）
+                if (errorMessage.includes('Sculpture_head') && 
+                    (errorMessage.includes('not found') || errorMessage.includes('expected to be'))) {
+                    // 如果 Sculpture_head 字段不存在或格式不对，只更新 Cover
+                    console.warn('Sculpture_head field issue detected, only updating Cover');
                     
                     const coverOnlyResponse = await fetch(
                         `https://api.notion.com/v1/pages/${userId}`,
@@ -103,13 +117,14 @@ export async function POST(request: NextRequest) {
 
                     if (coverOnlyResponse.ok) {
                         return NextResponse.json(
-                            { success: true, avatarUrl: publicUrl, warning: 'Sculpture_head 字段不存在，仅更新了 Cover' },
+                            { success: true, avatarUrl: publicUrl, warning: 'Sculpture_head 字段未正确配置，仅更新了 Cover' },
                             { status: 200 }
                         );
                     }
                 }
             } catch (parseError) {
                 // 解析错误失败，使用默认消息
+                console.error('[Avatar Update Notion] 解析错误信息失败:', parseError);
             }
 
             return NextResponse.json(
