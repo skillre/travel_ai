@@ -29,6 +29,7 @@ export default function UserProfileModal({
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadSuccess, setUploadSuccess] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<string>(''); // 上传状态提示：如 "正在获取上传凭证..."、"正在上传到云端..." 等
     const [copySuccess, setCopySuccess] = useState(false);
     const [nameUpdateError, setNameUpdateError] = useState<string | null>(null);
     const [nameUpdateSuccess, setNameUpdateSuccess] = useState(false);
@@ -52,20 +53,28 @@ export default function UserProfileModal({
 
         setIsUploading(true);
         setUploadError(null);
+        setUploadSuccess(false);
+        setUploadStatus('正在更新头像...');
 
         try {
             const success = await onUpdateAvatar(avatarUrl.trim());
             if (success) {
+                setUploadStatus('更新成功！');
                 setUploadSuccess(true);
                 setIsEditingAvatar(false);
                 setAvatarUrl('');
-                setTimeout(() => setUploadSuccess(false), 2000);
+                setIsUploading(false);
+                setTimeout(() => {
+                    setUploadSuccess(false);
+                    setUploadStatus('');
+                }, 3000);
             } else {
-                setUploadError('更新失败，请重试');
+                throw new Error('更新失败，请重试');
             }
         } catch (error) {
-            setUploadError('网络错误，请稍后重试');
-        } finally {
+            const errorMessage = error instanceof Error ? error.message : '网络错误，请稍后重试';
+            setUploadError(errorMessage);
+            setUploadStatus('');
             setIsUploading(false);
         }
     };
@@ -137,11 +146,14 @@ export default function UserProfileModal({
         setShowCropModal(false);
         setIsUploading(true);
         setUploadError(null);
+        setUploadSuccess(false);
+        setUploadStatus('正在准备上传...');
 
         try {
             console.log('开始上传头像流程...');
             
             // Step 1: 获取上传凭证
+            setUploadStatus('正在获取上传凭证...');
             console.log('Step 1: 请求上传凭证...');
             const signResponse = await fetch('/api/auth/avatar/sign', {
                 method: 'POST',
@@ -155,8 +167,17 @@ export default function UserProfileModal({
 
             if (!signResponse.ok) {
                 const errorText = await signResponse.text();
+                let errorMsg = `获取上传凭证失败 (${signResponse.status})`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    if (errorData.msg) {
+                        errorMsg = errorData.msg;
+                    }
+                } catch (e) {
+                    // 解析失败，使用默认消息
+                }
                 console.error('获取上传凭证失败:', signResponse.status, errorText);
-                throw new Error(`获取上传凭证失败 (${signResponse.status})`);
+                throw new Error(errorMsg);
             }
 
             const signData = await signResponse.json();
@@ -164,10 +185,11 @@ export default function UserProfileModal({
 
             if (!signData.success || !signData.uploadUrl || !signData.publicUrl) {
                 console.error('上传凭证数据不完整:', signData);
-                throw new Error(signData.msg || '获取上传凭证失败：响应数据不完整');
+                throw new Error(signData.msg || '获取上传凭证失败：服务器响应异常，请稍后重试');
             }
 
             // Step 2: 直接上传到 OSS
+            setUploadStatus('正在上传图片到云端存储...');
             console.log('Step 2: 上传文件到 OSS...', signData.uploadUrl);
             try {
                 const uploadResponse = await fetch(signData.uploadUrl, {
@@ -181,7 +203,7 @@ export default function UserProfileModal({
                 if (!uploadResponse.ok) {
                     const errorText = await uploadResponse.text();
                     console.error('上传到 OSS 失败:', uploadResponse.status, errorText);
-                    throw new Error(`上传到云存储失败 (${uploadResponse.status})`);
+                    throw new Error(`上传到云端存储失败 (${uploadResponse.status})`);
                 }
                 console.log('文件上传成功');
             } catch (uploadError) {
@@ -190,15 +212,17 @@ export default function UserProfileModal({
                     const errorMessage = uploadError.message || String(uploadError);
                     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Load failed') || errorMessage.includes('access control checks')) {
                         console.error('CORS 错误：OSS bucket 可能未正确配置 CORS 规则');
-                        throw new Error('上传失败：请检查 OSS bucket 的 CORS 配置。需要在 OSS 控制台配置允许跨域请求。');
+                        throw new Error('上传失败：浏览器安全限制。请联系管理员检查 OSS 存储配置。');
+                    }
+                    if (errorMessage.includes('network') || errorMessage.includes('Network')) {
+                        throw new Error('上传失败：网络连接异常，请检查网络后重试');
                     }
                 }
                 throw uploadError;
             }
 
-            console.log('文件上传成功');
-
             // Step 3: 同步到 Notion
+            setUploadStatus('正在同步到数据库...');
             console.log('Step 3: 同步到 Notion...', signData.publicUrl);
             const syncResponse = await fetch('/api/auth/avatar/update-notion', {
                 method: 'POST',
@@ -211,38 +235,69 @@ export default function UserProfileModal({
 
             if (!syncResponse.ok) {
                 const errorText = await syncResponse.text();
+                let errorMsg = `同步到数据库失败 (${syncResponse.status})`;
+                try {
+                    const errorData = JSON.parse(errorText);
+                    if (errorData.msg) {
+                        errorMsg = errorData.msg;
+                    }
+                } catch (e) {
+                    // 解析失败，使用默认消息
+                }
                 console.error('同步到 Notion 失败:', syncResponse.status, errorText);
-                throw new Error(`同步到数据库失败 (${syncResponse.status})`);
+                throw new Error(errorMsg);
             }
 
             const syncData = await syncResponse.json();
             console.log('Notion 同步响应:', syncData);
 
             if (!syncData.success) {
-                throw new Error(syncData.msg || '同步到数据库失败');
+                throw new Error(syncData.msg || '同步到数据库失败，请重试');
             }
 
             // 更新本地缓存
+            setUploadStatus('正在更新本地信息...');
             console.log('更新本地缓存...');
             const success = await onUpdateAvatar(signData.publicUrl);
             if (success) {
                 console.log('头像更新成功');
+                setUploadStatus('上传成功！');
                 setUploadSuccess(true);
-                setTimeout(() => setUploadSuccess(false), 2000);
+                setIsUploading(false);
+                // 3 秒后清除成功提示和状态
+                setTimeout(() => {
+                    setUploadSuccess(false);
+                    setUploadStatus('');
+                }, 3000);
             } else {
-                throw new Error('更新本地缓存失败');
+                throw new Error('更新本地缓存失败，请刷新页面查看最新头像');
             }
         } catch (error) {
             console.error('上传头像错误:', error);
-            const errorMessage = error instanceof Error ? error.message : '上传失败，请重试';
+            let errorMessage = '上传失败，请重试';
+            
+            if (error instanceof Error) {
+                errorMessage = error.message;
+                // 根据不同的错误类型提供更友好的提示
+                if (errorMessage.includes('网络') || errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+                    errorMessage = '网络连接失败，请检查网络后重试';
+                } else if (errorMessage.includes('CORS') || errorMessage.includes('跨域') || errorMessage.includes('浏览器安全')) {
+                    errorMessage = '上传失败：服务器配置问题，请联系管理员';
+                } else if (errorMessage.includes('数据库') || errorMessage.includes('Notion') || errorMessage.includes('同步')) {
+                    errorMessage = '头像已上传，但保存失败，请稍后重试或联系管理员';
+                } else if (errorMessage.includes('凭证') || errorMessage.includes('配置')) {
+                    errorMessage = '服务器配置错误，请联系管理员';
+                }
+            }
+            
             setUploadError(errorMessage);
-            // 确保错误信息能显示给用户
+            setUploadStatus('');
+            setIsUploading(false);
             console.error('错误详情:', {
                 message: errorMessage,
+                originalError: error,
                 stack: error instanceof Error ? error.stack : undefined,
             });
-        } finally {
-            setIsUploading(false);
         }
     };
 
@@ -390,17 +445,19 @@ export default function UserProfileModal({
                                 onClick={() => {
                                     setIsEditingAvatar(!isEditingAvatar);
                                     setUploadError(null);
+                                    setUploadStatus('');
                                 }}
-                                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-slate-600 hover:text-tender-blue-500 hover:scale-110 transition-all"
+                                disabled={isUploading}
+                                className="absolute bottom-1 right-1 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-slate-600 hover:text-tender-blue-500 hover:scale-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="修改头像"
                             >
                                 <Upload className="w-4 h-4" />
                             </button>
 
-                            {uploadSuccess && (
-                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-fresh-green-500 text-white text-xs rounded-full flex items-center gap-1 animate-fade-in">
-                                    <Check className="w-3 h-3" />
-                                    已更新
+                            {/* 上传中的覆盖层 */}
+                            {isUploading && (
+                                <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                                    <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
                                 </div>
                             )}
                         </div>
@@ -453,21 +510,49 @@ export default function UserProfileModal({
                                             </>
                                         )}
                                     </button>
-                                    </div>
                                 </div>
-                                {uploadError && (
-                                    <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
-                                        <p className="text-sm text-red-600 flex items-center gap-2">
-                                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                            <span>{uploadError}</span>
-                                        </p>
+                                </div>
+                                {/* 上传状态提示 */}
+                                {isUploading && uploadStatus && (
+                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                                            <p className="text-sm text-blue-700 font-medium">{uploadStatus}</p>
+                                        </div>
                                     </div>
                                 )}
-                                {isUploading && (
-                                    <p className="text-xs text-slate-500 flex items-center gap-1">
-                                        <div className="w-3 h-3 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
-                                        上传中...
-                                    </p>
+                                
+                                {/* 错误提示 */}
+                                {uploadError && !isUploading && (
+                                    <div className="p-3 bg-red-50 border-2 border-red-300 rounded-lg animate-fade-in">
+                                        <div className="flex items-start gap-3">
+                                            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-red-700 mb-1">上传失败</p>
+                                                <p className="text-sm text-red-600">{uploadError}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setUploadError(null);
+                                                    setIsEditingAvatar(false);
+                                                }}
+                                                className="text-red-400 hover:text-red-600 transition-colors"
+                                                aria-label="关闭错误提示"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* 成功提示 */}
+                                {uploadSuccess && !isUploading && (
+                                    <div className="p-3 bg-green-50 border-2 border-green-300 rounded-lg animate-fade-in">
+                                        <div className="flex items-center gap-3">
+                                            <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                                            <p className="text-sm font-medium text-green-700">头像上传成功！</p>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>
