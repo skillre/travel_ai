@@ -107,40 +107,52 @@ export async function POST(request: NextRequest) {
         const fileExtension = fileName?.split('.').pop() || 'jpg';
         const objectKey = `avatars/${userId}/${timestamp}-${random}.${fileExtension}`;
 
-        // 创建 OSS 客户端
+        // 创建 OSS 客户端 - 强制使用 HTTPS
         console.log('[Avatar Sign] 创建 OSS 客户端...');
         const client = new OSS({
             accessKeyId: finalAccessKeyId,
             accessKeySecret: finalAccessKeySecret,
             bucket: finalBucketName,
             region: finalRegion,
+            secure: true, // 强制使用 HTTPS
             // 可选：使用内网端点加速（如果服务器在阿里云内网）
             // endpoint: process.env.OSS_INTERNAL_ENDPOINT,
         });
 
         // 生成预签名上传 URL（有效期 1 小时）
         console.log('[Avatar Sign] 生成预签名 URL, objectKey:', objectKey);
-        const uploadUrl = client.signatureUrl(objectKey, {
+        let uploadUrl = client.signatureUrl(objectKey, {
             method: 'PUT',
             expires: 3600, // 1 小时（秒）
             'Content-Type': contentType || 'image/jpeg',
         });
-        console.log('[Avatar Sign] 预签名 URL 生成成功');
+        
+        // 确保 URL 使用 HTTPS（修复混合内容问题）
+        if (uploadUrl.startsWith('http://')) {
+            uploadUrl = uploadUrl.replace('http://', 'https://');
+            console.log('[Avatar Sign] 已将预签名 URL 从 HTTP 转换为 HTTPS');
+        }
+        console.log('[Avatar Sign] 预签名 URL 生成成功:', uploadUrl.substring(0, 50) + '...');
 
         // 生成公共访问 URL
-        // 如果 publicUrl 是自定义域名，直接拼接；否则使用 OSS 标准格式
+        // 确保使用 HTTPS（修复混合内容问题）
         let finalPublicUrlForResponse: string;
         if (finalPublicUrl.includes('aliyuncs.com') || finalPublicUrl.startsWith('http')) {
-            // 如果已经是完整 URL，直接使用；否则使用 OSS 标准格式
-            if (finalPublicUrl.startsWith('http')) {
+            // 如果已经是完整 URL，确保使用 HTTPS
+            if (finalPublicUrl.startsWith('http://')) {
+                finalPublicUrlForResponse = `${finalPublicUrl.replace('http://', 'https://').replace(/\/$/, '')}/${objectKey}`;
+            } else if (finalPublicUrl.startsWith('https://')) {
                 finalPublicUrlForResponse = `${finalPublicUrl.replace(/\/$/, '')}/${objectKey}`;
             } else {
-                // 标准 OSS 域名格式
+                // 标准 OSS 域名格式（使用 HTTPS）
                 finalPublicUrlForResponse = `https://${finalBucketName}.${finalRegion}.aliyuncs.com/${objectKey}`;
             }
         } else {
-            // 自定义域名
-            finalPublicUrlForResponse = `${finalPublicUrl.replace(/\/$/, '')}/${objectKey}`;
+            // 自定义域名，如果没有协议，添加 https://
+            const baseUrl = finalPublicUrl.startsWith('http') 
+                ? finalPublicUrl.replace('http://', 'https://')
+                : `https://${finalPublicUrl}`;
+            finalPublicUrlForResponse = `${baseUrl.replace(/\/$/, '')}/${objectKey}`;
         }
 
         console.log('[Avatar Sign] 返回响应:', {

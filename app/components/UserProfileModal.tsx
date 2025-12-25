@@ -169,18 +169,28 @@ export default function UserProfileModal({
 
             // Step 2: 直接上传到 OSS
             console.log('Step 2: 上传文件到 OSS...', signData.uploadUrl);
-            const uploadResponse = await fetch(signData.uploadUrl, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'image/jpeg',
-                },
-                body: croppedImageBlob,
-            });
+            try {
+                const uploadResponse = await fetch(signData.uploadUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'image/jpeg',
+                    },
+                    body: croppedImageBlob,
+                });
 
-            if (!uploadResponse.ok) {
-                const errorText = await uploadResponse.text();
-                console.error('上传到 OSS 失败:', uploadResponse.status, errorText);
-                throw new Error(`上传到云存储失败 (${uploadResponse.status})`);
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text();
+                    console.error('上传到 OSS 失败:', uploadResponse.status, errorText);
+                    throw new Error(`上传到云存储失败 (${uploadResponse.status})`);
+                }
+                console.log('文件上传成功');
+            } catch (uploadError) {
+                // 检查是否是 CORS 错误
+                if (uploadError instanceof TypeError && uploadError.message.includes('Failed to fetch') || uploadError.message.includes('Load failed')) {
+                    console.error('CORS 错误：OSS bucket 可能未正确配置 CORS 规则');
+                    throw new Error('上传失败：请检查 OSS bucket 的 CORS 配置。需要在 OSS 控制台配置允许跨域请求。');
+                }
+                throw uploadError;
             }
 
             console.log('文件上传成功');
