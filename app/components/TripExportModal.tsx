@@ -65,6 +65,10 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
     const [isZipping, setIsZipping] = useState(false);
     const [statusMessage, setStatusMessage] = useState('准备中...');
 
+    // 触摸滑动相关 ref
+    const touchStartRef = useRef(0);
+    const touchEndRef = useRef(0);
+
     // Reset when closed
     useEffect(() => {
         if (!isOpen) {
@@ -229,6 +233,33 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
         setCurrentIndex(prev => (prev - 1 + images.length) % images.length);
     };
 
+    // 触摸滑动处理
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartRef.current = e.touches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        touchEndRef.current = e.touches[0].clientX;
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStartRef.current || !touchEndRef.current) return;
+        
+        const distance = touchStartRef.current - touchEndRef.current;
+        const minSwipeDistance = 50;
+
+        if (distance > minSwipeDistance) {
+            // 向左滑动，显示下一张
+            nextImage();
+        } else if (distance < -minSwipeDistance) {
+            // 向右滑动，显示上一张
+            prevImage();
+        }
+        
+        touchStartRef.current = 0;
+        touchEndRef.current = 0;
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -280,13 +311,19 @@ export default function TripExportModal({ isOpen, onClose, tripPlan }: TripExpor
                                 <ChevronLeft className="w-6 h-6" />
                             </button>
 
-                            {/* Image Container */}
-                            <div className="relative h-full flex-1 flex items-center justify-center overflow-hidden py-4">
+                            {/* Image Container - 支持触摸滑动 */}
+                            <div 
+                                className="relative h-full flex-1 flex items-center justify-center overflow-hidden py-4 touch-pan-y"
+                                onTouchStart={handleTouchStart}
+                                onTouchMove={handleTouchMove}
+                                onTouchEnd={handleTouchEnd}
+                            >
                                 {images[currentIndex].url ? (
                                     <img
                                         src={images[currentIndex].url}
                                         alt={images[currentIndex].name}
-                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300"
+                                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-300 select-none"
+                                        draggable={false}
                                     />
                                 ) : (
                                     <div className="flex items-center justify-center w-64 h-64 bg-slate-800 rounded-lg text-slate-500">

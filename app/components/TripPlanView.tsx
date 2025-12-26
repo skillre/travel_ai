@@ -224,15 +224,17 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         onSelectDay={handleSelectDay}
                     />
 
-                    {/* 移动端右上角按钮组 */}
-                    <div className="absolute top-4 right-4 z-40 flex items-center gap-2 animate-in fade-in zoom-in duration-300 delay-150">
-                        {/* 用户头像 */}
+                    {/* 移动端右上角用户头像 - 仅保留这一个，当详情抽屉打开时隐藏 */}
+                    <div className={`absolute top-4 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150 ${isDetailOpen ? 'hidden' : ''}`}>
                         <UserAvatar
                             user={user || null}
                             onClick={handleUserClick}
                             size="md"
                         />
-                        {/* 分享按钮 */}
+                    </div>
+
+                    {/* 移动端导出按钮 - 移到下方避免挡住行程总览 */}
+                    <div className="absolute bottom-24 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150">
                         <button
                             onClick={() => setIsExportModalOpen(true)}
                             className="flex items-center gap-1.5 px-3 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
