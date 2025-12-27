@@ -222,6 +222,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         selectedDay={selectedDay}
                         timeline={tripPlan.timeline}
                         onSelectDay={handleSelectDay}
+                        onExport={() => setIsExportModalOpen(true)}
                     />
 
                     {/* 移动端右上角用户头像 - 仅保留这一个，当详情抽屉打开时隐藏 */}
@@ -233,17 +234,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         />
                     </div>
 
-                    {/* 移动端导出按钮 - 移到下方避免挡住行程总览 */}
-                    <div className="absolute bottom-24 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150">
-                        <button
-                            onClick={() => setIsExportModalOpen(true)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
-                            aria-label="导出行程"
-                        >
-                            <span className="text-sm">🗺️</span>
-                            <span>导出</span>
-                        </button>
-                    </div>
+
 
                     {/* ===== 底部抽屉面板 (行程列表) ===== */}
                     <MobileBottomSheet title={tripPlan.meta.city}>
@@ -282,14 +273,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                     >
                         {/* 内容区域 (包含 Header 和 Timeline，以支持整体滚动) */}
                         <div className="flex-1 overflow-y-auto relative scroll-smooth">
-                            {/* 桌面端用户头像 - 右上角 */}
-                            <div className="absolute top-4 right-4 z-50">
-                                <UserAvatar
-                                    user={user || null}
-                                    onClick={handleUserClick}
-                                    size="md"
-                                />
-                            </div>
+
 
                             {/* Header Canvas (Image & Title) */}
                             <div className="relative h-40 md:h-48 w-full shrink-0">

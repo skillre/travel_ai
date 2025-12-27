@@ -12,6 +12,7 @@ interface DayOverviewBannerProps {
     selectedDay: number | null;
     timeline: TripPlanDay[];
     onSelectDay: (index: number | null) => void;
+    onExport?: () => void;
 }
 
 // 每天路线的颜色
@@ -27,7 +28,8 @@ export default function DayOverviewBanner({
     totalFood,
     selectedDay,
     timeline,
-    onSelectDay
+    onSelectDay,
+    onExport
 }: DayOverviewBannerProps) {
     const [isVisible, setIsVisible] = useState(true);
     const [isDragging, setIsDragging] = useState(false);
@@ -90,18 +92,31 @@ export default function DayOverviewBanner({
                 style={isDragging ? { transform: `translateY(${translateY}px)` } : {}}
             >
                 <div className="px-3 py-2.5">
-                    {/* 城市名称 + 统计数据 */}
+                    {/* 城市名称 + 统计数据 + 导出按钮 */}
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <span className="text-base">📍</span>
                             <h1 className="font-bold text-slate-800 text-sm leading-tight">{city}</h1>
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                            <span className="font-bold text-slate-700">{days}</span>天
-                            <span className="mx-0.5">·</span>
-                            <span className="font-bold text-teal-600">{totalSpots}</span>景点
-                            <span className="mx-0.5">·</span>
-                            <span className="font-bold text-orange-600">{totalFood}</span>美食
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                <span className="font-bold text-slate-700">{days}</span>天
+                                <span className="mx-0.5">·</span>
+                                <span className="font-bold text-teal-600">{totalSpots}</span>景点
+                                <span className="mx-0.5">·</span>
+                                <span className="font-bold text-orange-600">{totalFood}</span>美食
+                            </div>
+                            {/* 导出按钮 */}
+                            {onExport && (
+                                <button
+                                    onClick={onExport}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-md border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
+                                    aria-label="导出行程"
+                                >
+                                    <span className="text-sm">🗺️</span>
+                                    <span>导出</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
