@@ -225,14 +225,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                         onExport={() => setIsExportModalOpen(true)}
                     />
 
-                    {/* 移动端右上角用户头像 - 仅保留这一个，当详情抽屉打开时隐藏 */}
-                    <div className={`absolute top-4 right-4 z-40 animate-in fade-in zoom-in duration-300 delay-150 ${isDetailOpen ? 'hidden' : ''}`}>
-                        <UserAvatar
-                            user={user || null}
-                            onClick={handleUserClick}
-                            size="md"
-                        />
-                    </div>
+
 
 
 
@@ -341,16 +334,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
 
                             {/* 天数切换按钮组 - Sticky Top */}
                             <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-sm shadow-sm flex items-center gap-2 p-3 border-b border-slate-100 overflow-x-auto no-scrollbar">
-                                {/* 总览按钮 - 触发导出弹窗 */}
-                                <button
-                                    onClick={() => setIsExportModalOpen(true)}
-                                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100 hover:shadow-sm"
-                                >
-                                    <Map className="w-3.5 h-3.5" />
-                                    总览
-                                </button>
 
-                                <div className="w-[1px] h-4 bg-slate-300 mx-1"></div>
 
                                 <button
                                     onClick={() => handleSelectDay(null)}
