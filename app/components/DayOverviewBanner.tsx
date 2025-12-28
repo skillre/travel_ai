@@ -93,12 +93,12 @@ export default function DayOverviewBanner({
             >
                 <div className="px-3 py-2.5">
                     {/* 城市名称 + 统计数据 + 导出按钮 */}
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2 pt-0.5">
                             <span className="text-base">📍</span>
                             <h1 className="font-bold text-slate-800 text-sm leading-tight">{city}</h1>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end gap-1">
                             <div className="flex items-center gap-1 text-[10px] text-slate-500">
                                 <span className="font-bold text-slate-700">{days}</span>天
                                 <span className="mx-0.5">·</span>
