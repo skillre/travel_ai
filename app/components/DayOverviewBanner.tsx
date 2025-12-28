@@ -108,45 +108,53 @@ export default function DayOverviewBanner({
                     </div>
 
                     {/* 天数切换按钮 + 导出按钮 */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-                        <button
-                            onClick={() => onSelectDay(null)}
-                            className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === null
-                                ? 'bg-slate-800 text-white shadow-sm'
-                                : 'bg-slate-100 text-slate-600'
-                                }`}
-                        >
-                            <Layers className="w-3 h-3" />
-                            全部
-                        </button>
-                        {timeline.map((day, index) => (
-                            <button
-                                key={day.day}
-                                onClick={() => onSelectDay(index)}
-                                className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
-                                    ? 'text-white shadow-sm'
-                                    : 'bg-slate-100 text-slate-600'
-                                    }`}
-                                style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
-                            >
-                                D{day.day}
-                            </button>
-                        ))}
+                    <div className="flex items-center">
+                        {/* 日期按钮容器 - 可滚动 */}
+                        <div className="flex-1 overflow-x-auto scrollbar-hide pr-1">
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={() => onSelectDay(null)}
+                                    className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === null
+                                        ? 'bg-slate-800 text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-600'
+                                        }`}
+                                >
+                                    <Layers className="w-3 h-3" />
+                                    全部
+                                </button>
+                                {timeline.map((day, index) => (
+                                    <button
+                                        key={day.day}
+                                        onClick={() => onSelectDay(index)}
+                                        className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all touch-feedback ${selectedDay === index
+                                            ? 'text-white shadow-sm'
+                                            : 'bg-slate-100 text-slate-600'
+                                            }`}
+                                        style={selectedDay === index ? { backgroundColor: dayColors[index % dayColors.length] } : {}}
+                                    >
+                                        D{day.day}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         
-                        {/* 隔离线 */}
-                        <div className="w-[1px] h-4 bg-slate-300 mx-1 flex-shrink-0"></div>
-                        
-                        {/* 导出按钮 */}
-                        {onExport && (
-                            <button
-                                onClick={onExport}
-                                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 touch-feedback flex-shrink-0"
-                                aria-label="导出行程"
-                            >
-                                <span className="text-sm">🗺️</span>
-                                <span>导出</span>
-                            </button>
-                        )}
+                        {/* 隔离线 + 导出按钮 - 固定在右侧 */}
+                        <div className="flex items-center gap-1.5">
+                            {/* 隔离线 */}
+                            <div className="w-[1px] h-4 bg-slate-300 flex-shrink-0"></div>
+                            
+                            {/* 导出按钮 */}
+                            {onExport && (
+                                <button
+                                    onClick={onExport}
+                                    className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 touch-feedback flex-shrink-0"
+                                    aria-label="导出行程"
+                                >
+                                    <span className="text-sm">🗺️</span>
+                                    <span>导出</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
