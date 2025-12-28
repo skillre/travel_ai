@@ -92,35 +92,22 @@ export default function DayOverviewBanner({
                 style={isDragging ? { transform: `translateY(${translateY}px)` } : {}}
             >
                 <div className="px-3 py-2.5">
-                    {/* 城市名称 + 统计数据 + 导出按钮 */}
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2 pt-0.5">
+                    {/* 城市名称 + 统计数据 */}
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
                             <span className="text-base">📍</span>
                             <h1 className="font-bold text-slate-800 text-sm leading-tight">{city}</h1>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                <span className="font-bold text-slate-700">{days}</span>天
-                                <span className="mx-0.5">·</span>
-                                <span className="font-bold text-teal-600">{totalSpots}</span>景点
-                                <span className="mx-0.5">·</span>
-                                <span className="font-bold text-orange-600">{totalFood}</span>美食
-                            </div>
-                            {/* 导出按钮 */}
-                            {onExport && (
-                                <button
-                                    onClick={onExport}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-md border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95"
-                                    aria-label="导出行程"
-                                >
-                                    <span className="text-sm">🗺️</span>
-                                    <span>导出</span>
-                                </button>
-                            )}
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                            <span className="font-bold text-slate-700">{days}</span>天
+                            <span className="mx-0.5">·</span>
+                            <span className="font-bold text-teal-600">{totalSpots}</span>景点
+                            <span className="mx-0.5">·</span>
+                            <span className="font-bold text-orange-600">{totalFood}</span>美食
                         </div>
                     </div>
 
-                    {/* 天数切换按钮 */}
+                    {/* 天数切换按钮 + 导出按钮 */}
                     <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                         <button
                             onClick={() => onSelectDay(null)}
@@ -145,6 +132,21 @@ export default function DayOverviewBanner({
                                 D{day.day}
                             </button>
                         ))}
+                        
+                        {/* 隔离线 */}
+                        <div className="w-[1px] h-4 bg-slate-300 mx-1 flex-shrink-0"></div>
+                        
+                        {/* 导出按钮 */}
+                        {onExport && (
+                            <button
+                                onClick={onExport}
+                                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md shadow-md border border-white/50 text-indigo-600 font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 touch-feedback flex-shrink-0"
+                                aria-label="导出行程"
+                            >
+                                <span className="text-sm">🗺️</span>
+                                <span>导出</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
