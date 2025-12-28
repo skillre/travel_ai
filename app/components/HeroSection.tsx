@@ -114,7 +114,7 @@ export default function HeroSection({
                             onBlur={() => setIsFocused(false)}
                             onKeyPress={handleKeyPress}
                             placeholder="输入您的愿望，例如：大理洱海发呆、京都看樱花..."
-                            className="flex-1 bg-transparent border-none text-slate-700 text-lg md:text-xl placeholder-slate-400 focus:ring-0 px-4 py-6 min-w-0 font-normal tracking-wide"
+                            className="flex-1 bg-transparent border-none text-slate-700 text-lg md:text-xl placeholder-slate-400 focus:ring-0 focus:outline-none px-4 py-4 min-w-0 font-normal tracking-wide"
                             disabled={isLoading}
                         />
                         <div className="pr-3">

@@ -52,7 +52,7 @@ export default function Header({
                                 onBlur={() => setTimeout(() => setIsFocused(false), 200)}
                                 onKeyPress={handleKeyPress}
                                 placeholder={isFocused ? "输入旅行需求..." : "输入新的旅行需求..."}
-                                className="w-full pl-10 pr-4 py-2.5 bg-white/60 border border-slate-200/60 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 focus:border-tender-blue-400/50 hover:bg-white/80 transition-all text-sm shadow-inner-sm"
+                                className="w-full pl-10 pr-4 py-2.5 bg-white/60 border border-slate-200/60 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none hover:bg-white/80 transition-all text-sm shadow-inner-sm"
                                 disabled={isLoading}
                             />
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-tender-blue-500 transition-colors">🔍</span>

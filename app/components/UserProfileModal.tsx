@@ -494,7 +494,7 @@ export default function UserProfileModal({
                                         value={avatarUrl}
                                         onChange={(e) => setAvatarUrl(e.target.value)}
                                             placeholder="或输入图片链接..."
-                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50 focus:border-tender-blue-400"
+                                        className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none"
                                     />
                                     <button
                                         onClick={handleAvatarUrlSubmit}
@@ -576,7 +576,7 @@ export default function UserProfileModal({
                                                 setNameUpdateError(null);
                                             }
                                         }}
-                                        className="flex-1 max-w-xs px-4 py-2 bg-white border-2 border-tender-blue-400 rounded-xl text-xl font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-tender-blue-400/50"
+                                        className="flex-1 max-w-xs px-4 py-2 bg-white border-2 border-tender-blue-400 rounded-xl text-xl font-bold text-slate-800 focus:outline-none"
                                         autoFocus
                                     />
                                     <button
