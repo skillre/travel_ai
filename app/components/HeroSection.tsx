@@ -82,12 +82,12 @@ export default function HeroSection({
                     </h1>
 
                     <p className="text-base md:text-2xl text-slate-600 font-light max-w-2xl mx-auto leading-relaxed">
-                        让 AI 为您定制一场 <span className="bg-tender-blue-100/80 text-tender-blue-700 px-2 py-0.5 rounded-lg font-medium mx-1">治愈心灵</span> 的完美旅程
+                        为您定制一场 <span className="bg-tender-blue-100/80 text-tender-blue-700 px-2 py-0.5 rounded-lg font-medium mx-1">治愈心灵</span> 的完美旅程
                     </p>
 
                     {/* 特性标签 - 移动端隐藏 */}
                     <div className="hidden md:flex items-center justify-center gap-8 mt-8 text-sm text-slate-500 font-medium tracking-wide">
-                        <span className="flex items-center gap-2 bg-white/40 px-4 py-1.5 rounded-full border border-white/50 shadow-sm"><Sparkles className="w-4 h-4 text-amber-400" /> 智能推荐</span>
+                        <span className="flex items-center gap-2 bg-white/40 px-4 py-1.5 rounded-full border border-white/50 shadow-sm"><Sparkles className="w-4 h-4 text-amber-400" /> 精心推荐</span>
                         <span className="flex items-center gap-2 bg-white/40 px-4 py-1.5 rounded-full border border-white/50 shadow-sm"><Map className="w-4 h-4 text-fresh-green-500" /> 地道路线</span>
                     </div>
                 </div>
