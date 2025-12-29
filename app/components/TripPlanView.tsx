@@ -210,6 +210,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                             selectedDay={selectedDay}
                             onMarkerClick={handleMarkerClick}
                             onReady={handleMapReady}
+                            provider={tripPlan.meta.area && tripPlan.meta.area !== '中国大陆' ? 'mapbox' : 'amap'}
                         />
                     </div>
 
@@ -418,6 +419,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
                             selectedDay={selectedDay}
                             onMarkerClick={handleMarkerClick}
                             onReady={handleMapReady}
+                            provider={tripPlan.meta.area && tripPlan.meta.area !== '中国大陆' ? 'mapbox' : 'amap'}
                         />
 
                         {/* 详情抽屉 (作为地图区域的浮层) */}
@@ -464,4 +466,3 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
         </div>
     );
 }
-

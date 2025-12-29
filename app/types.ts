@@ -8,6 +8,7 @@ export interface TripPlanMeta {
     trip_vibe: string;
     total_estimated_cost: number;
     suggestion: string;
+    area?: string;
 }
 
 export interface TripPlanItemContent {
@@ -73,6 +74,7 @@ export interface LegacyTripData {
     trip_overview?: string;
     trip_vibe?: string;
     daily_plan: LegacyDailyPlan[];
+    area?: string;
 }
 
 // ===========================================

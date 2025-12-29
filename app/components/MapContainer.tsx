@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface Route {
     name: string;
@@ -29,6 +30,7 @@ export interface MapContainerRef {
 interface MapContainerProps {
     dailyPlan: DailyPlan[];
     onMarkerClick?: (dayIndex: number, spotIndex: number) => void;
+    provider?: 'amap' | 'mapbox';
 }
 
 // 每天路线的颜色
@@ -37,10 +39,11 @@ const dayColors = [
     '#FFEAA7', '#DDA0DD', '#98D8C8'
 ];
 
-const MapContainer = forwardRef<MapContainerRef, MapContainerProps>(({ dailyPlan, onMarkerClick }, ref) => {
+const MapContainer = forwardRef<MapContainerRef, MapContainerProps>(({ dailyPlan, onMarkerClick, provider = 'amap' }, ref) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<any>(null);
     const AMapRef = useRef<any>(null);
+    const mapboxRef = useRef<any>(null);
     const markersRef = useRef<any[][]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -53,20 +56,38 @@ const MapContainer = forwardRef<MapContainerRef, MapContainerProps>(({ dailyPlan
             const map = mapInstance.current;
             if (!map || !markersRef.current[dayIndex]?.[spotIndex]) return;
 
-            const marker = markersRef.current[dayIndex][spotIndex];
-            const position = marker.getPosition();
-            map.setCenter(position);
-            map.setZoom(15);
+            const marker = markersRef.current[dayIndex]?.[spotIndex];
+            if (!marker) return;
+            if (provider === 'mapbox') {
+                const el = marker.getElement?.();
+                const lngLat = marker.getLngLat?.();
+                if (lngLat) {
+                    map.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15 });
+                }
+            } else {
+                const position = marker.getPosition();
+                map.setCenter(position);
+                map.setZoom(15);
+            }
         },
         highlightSpot: (dayIndex: number, spotIndex: number) => {
             setHighlightedSpot({ day: dayIndex, spot: spotIndex });
             // 让标记跳动
             const marker = markersRef.current[dayIndex]?.[spotIndex];
             if (marker) {
-                marker.setAnimation('AMAP_ANIMATION_BOUNCE');
-                setTimeout(() => {
-                    marker.setAnimation('AMAP_ANIMATION_NONE');
-                }, 1500);
+                if (provider === 'mapbox') {
+                    const el = marker.getElement?.();
+                    if (el) {
+                        el.style.transition = 'transform 0.2s ease';
+                        el.style.transform = 'scale(1.15)';
+                        setTimeout(() => { el.style.transform = 'scale(1)'; }, 600);
+                    }
+                } else {
+                    marker.setAnimation('AMAP_ANIMATION_BOUNCE');
+                    setTimeout(() => {
+                        marker.setAnimation('AMAP_ANIMATION_NONE');
+                    }, 1500);
+                }
             }
         },
         clearHighlight: () => {
@@ -80,44 +101,67 @@ const MapContainer = forwardRef<MapContainerRef, MapContainerProps>(({ dailyPlan
 
         const initMap = async () => {
             try {
-                const AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
+                if (provider === 'mapbox') {
+                    const mapboxgl = (await import('mapbox-gl')).default;
+                    mapboxRef.current = mapboxgl;
+                    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+                    if (!token) throw new Error('缺少 Mapbox Token');
+                    mapboxgl.accessToken = token;
+                    if (!isMounted || !mapRef.current) return;
+                    const map = new mapboxgl.Map({
+                        container: mapRef.current,
+                        style: 'mapbox://styles/mapbox/streets-v12',
+                        center: [118.089, 24.479],
+                        zoom: 12
+                    });
+                    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                    map.on('load', () => {
+                        if (isMounted) {
+                            setIsLoading(false);
+                            setMapReady(true);
+                        }
+                    });
+                    mapInstance.current = map;
+                } else {
+                    const AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
 
-                const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
-                if (!amapKey) {
-                    throw new Error('缺少高德地图 API Key');
-                }
-
-                const AMap = await AMapLoader.load({
-                    key: amapKey,
-                    version: '1.4.15',
-                    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.InfoWindow'],
-                });
-
-                if (!isMounted || !mapRef.current) return;
-
-                AMapRef.current = AMap;
-
-                const map = new AMap.Map(mapRef.current, {
-                    zoom: 12,
-                    center: [118.089, 24.479],
-                    resizeEnable: true,
-                    mapStyle: 'amap://styles/darkblue',
-                });
-
-                mapInstance.current = map;
-
-                map.on('complete', () => {
-                    if (isMounted) {
-                        setIsLoading(false);
-                        setMapReady(true);
+                    const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
+                    if (!amapKey) {
+                        throw new Error('缺少高德地图 API Key');
                     }
-                });
 
-                map.addControl(new AMap.Scale());
-                map.addControl(new AMap.ToolBar({
-                    position: 'RB',
-                    liteStyle: true,
-                }));
+                    const AMap = await AMapLoader.load({
+                        key: amapKey,
+                        version: '1.4.15',
+                        plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.InfoWindow'],
+                    });
+
+                    if (!isMounted || !mapRef.current) return;
+
+                    AMapRef.current = AMap;
+
+                    const map = new AMap.Map(mapRef.current, {
+                        zoom: 12,
+                        center: [118.089, 24.479],
+                        resizeEnable: true,
+                        mapStyle: 'amap://styles/darkblue',
+                    });
+
+                    mapInstance.current = map;
+
+                    map.on('complete', () => {
+                        if (isMounted) {
+                            setIsLoading(false);
+                            setMapReady(true);
+                        }
+                    });
+
+                    map.addControl(new AMap.Scale());
+                    map.addControl(new AMap.ToolBar({
+                        position: 'RB',
+                        liteStyle: true,
+                    }));
+                }
 
             } catch (err) {
                 console.error('Map init error:', err);
@@ -133,19 +177,95 @@ const MapContainer = forwardRef<MapContainerRef, MapContainerProps>(({ dailyPlan
         return () => {
             isMounted = false;
             if (mapInstance.current) {
-                mapInstance.current.destroy();
+                if (provider === 'mapbox') {
+                    mapInstance.current.remove();
+                } else {
+                    mapInstance.current.destroy();
+                }
                 mapInstance.current = null;
             }
         };
-    }, []);
+    }, [provider]);
 
     // 绘制标记和路线
     const drawMarkersAndRoutes = useCallback(() => {
         const map = mapInstance.current;
+        if (!map || !dailyPlan || dailyPlan.length === 0) return;
+
+        if (provider === 'mapbox') {
+            markersRef.current = [];
+            const allCoords: [number, number][] = [];
+            dailyPlan.forEach((day, dayIndex) => {
+                const color = dayColors[dayIndex % dayColors.length];
+                const dayMarkers: any[] = [];
+                const pathCoords: [number, number][] = [];
+                day.routes.forEach((route, routeIndex) => {
+                    const el = document.createElement('div');
+                    el.style.background = color;
+                    el.style.color = 'white';
+                    el.style.padding = '6px 10px';
+                    el.style.borderRadius = '16px';
+                    el.style.fontSize = '12px';
+                    el.style.fontWeight = 'bold';
+                    el.style.boxShadow = `0 4px 12px ${color}66`;
+                    el.style.border = '2px solid rgba(255,255,255,0.3)';
+                    el.style.cursor = 'pointer';
+                    el.innerHTML = `${route.emoji || ''} ${route.name}`;
+                    const marker = new mapboxRef.current.Marker({ element: el })
+                        .setLngLat([route.longitude, route.latitude])
+                        .addTo(map);
+                    el.addEventListener('click', () => {
+                        const html = `
+                            <div style="padding:16px;min-width:240px;max-width:320px;font-family:system-ui">
+                                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                                    <span style="font-size:28px;">${route.emoji || '📍'}</span>
+                                    <div>
+                                        <h3 style="margin:0;color:${color};font-size:18px;font-weight:bold">${route.name}</h3>
+                                        <span style="font-size:12px;color:#888">Day ${day.day} · 第${routeIndex + 1}站</span>
+                                    </div>
+                                </div>
+                                <p style="margin:0;color:#555;font-size:14px;line-height:1.6">${route.desc || ''}</p>
+                            </div>
+                        `;
+                        new mapboxRef.current.Popup({ offset: 25 }).setHTML(html).setLngLat([route.longitude, route.latitude]).addTo(map);
+                        onMarkerClick?.(dayIndex, routeIndex);
+                    });
+                    dayMarkers.push(marker);
+                    pathCoords.push([route.longitude, route.latitude]);
+                    allCoords.push([route.longitude, route.latitude]);
+                });
+                markersRef.current.push(dayMarkers);
+                if (pathCoords.length > 1) {
+                    const sourceId = `legacy-route-src-${dayIndex}`;
+                    const layerId = `legacy-route-layer-${dayIndex}`;
+                    if (map.getLayer(layerId)) map.removeLayer(layerId);
+                    if (map.getSource(sourceId)) map.removeSource(sourceId);
+                    map.addSource(sourceId, {
+                        type: 'geojson',
+                        data: {
+                            type: 'Feature',
+                            geometry: { type: 'LineString', coordinates: pathCoords }
+                        }
+                    });
+                    map.addLayer({
+                        id: layerId,
+                        type: 'line',
+                        source: sourceId,
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: { 'line-color': color, 'line-width': 5, 'line-opacity': 0.85 }
+                    });
+                }
+            });
+            if (allCoords.length > 0) {
+                const bounds = new mapboxRef.current.LngLatBounds(allCoords[0], allCoords[0]);
+                for (const c of allCoords) bounds.extend(c);
+                map.fitBounds(bounds, { padding: 80 });
+            }
+            return;
+        }
+
         const AMap = AMapRef.current;
-
-        if (!map || !AMap || !dailyPlan || dailyPlan.length === 0) return;
-
+        if (!AMap) return;
         map.clearMap();
         markersRef.current = [];
 

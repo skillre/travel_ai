@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { TripPlanDay, TripPlanItem } from '../types';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 export interface MapContainerNewRef {
     panToSpot: (dayIndex: number, itemIndex: number) => void;
@@ -19,6 +20,7 @@ interface MapContainerNewProps {
     selectedDay?: number | null;
     onMarkerClick?: (dayIndex: number, itemIndex: number) => void;
     onReady?: (methods: MapContainerNewRef) => void; // 组件就绪时回调
+    provider?: 'amap' | 'mapbox';
 }
 
 // 每天路线的颜色 - 鲜明的调色板
@@ -28,10 +30,11 @@ const dayColors = [
 ];
 
 const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
-    ({ timeline, selectedDay = null, onMarkerClick, onReady }, ref) => {
+    ({ timeline, selectedDay = null, onMarkerClick, onReady, provider = 'amap' }, ref) => {
         const mapContainerRef = useRef<HTMLDivElement>(null);
         const mapInstance = useRef<any>(null);
         const AMapRef = useRef<any>(null);
+        const mapboxRef = useRef<any>(null);
         const markersRef = useRef<any[][]>([]);
         const polylinesRef = useRef<any[][]>([]); // 按天分组存储路线和交通图标
         const hoverInfoWindowRef = useRef<any>(null);
@@ -231,9 +234,109 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         // 绘制标记和路线 - 只在初始化时调用一次
         const drawMarkersAndRoutes = useCallback(() => {
             const map = mapInstance.current;
+            if (!map || !timeline || timeline.length === 0) return;
+            if (provider === 'mapbox') {
+                // Mapbox 渲染
+                markersRef.current = [];
+                polylinesRef.current = [];
+                const allCoords: [number, number][] = [];
+
+                timeline.forEach((day, dayIndex) => {
+                    const dayColor = dayColors[dayIndex % dayColors.length];
+                    const dayMarkers: any[] = [];
+                    const pathCoords: [number, number][] = [];
+
+                    day.items.forEach((item, itemIndex) => {
+                        const el = document.createElement('div');
+                        el.style.background = '#0d9488';
+                        el.style.color = 'white';
+                        el.style.padding = '6px 10px';
+                        el.style.borderRadius = '16px';
+                        el.style.fontSize = '12px';
+                        el.style.fontWeight = 'bold';
+                        el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                        el.style.border = '2px solid rgba(255,255,255,0.3)';
+                        el.style.cursor = 'pointer';
+                        el.innerHTML = `${item.emoji || ''} ${item.title}`;
+
+                        const marker = new mapboxRef.current.Marker({ element: el })
+                            .setLngLat([item.location.lng, item.location.lat])
+                            .addTo(map);
+
+                        el.addEventListener('click', () => {
+                            const html = `
+                                <div style="padding:16px;min-width:240px;max-width:320px;font-family:system-ui">
+                                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                                        <span style="font-size:28px;">${item.emoji || '📍'}</span>
+                                        <div>
+                                            <h3 style="margin:0;color:${dayColor};font-size:18px;font-weight:bold">${item.title}</h3>
+                                            <span style="font-size:12px;color:#888">Day ${day.day} · 第${itemIndex + 1}站</span>
+                                        </div>
+                                    </div>
+                                    <p style="margin:0;color:#555;font-size:14px;line-height:1.6">${item.content?.desc || ''}</p>
+                                </div>
+                            `;
+                            new mapboxRef.current.Popup({ offset: 25 }).setHTML(html).setLngLat([item.location.lng, item.location.lat]).addTo(map);
+                            onMarkerClick?.(dayIndex, itemIndex);
+                        });
+
+                        dayMarkers.push(marker);
+                        pathCoords.push([item.location.lng, item.location.lat]);
+                        allCoords.push([item.location.lng, item.location.lat]);
+                    });
+
+                    markersRef.current.push(dayMarkers);
+
+                    if (pathCoords.length > 1) {
+                        const sourceId = `route-src-${dayIndex}`;
+                        const layerId = `route-layer-${dayIndex}`;
+                        if (map.getLayer(layerId)) {
+                            map.removeLayer(layerId);
+                        }
+                        if (map.getSource(sourceId)) {
+                            map.removeSource(sourceId);
+                        }
+                        map.addSource(sourceId, {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                geometry: {
+                                    type: 'LineString',
+                                    coordinates: pathCoords
+                                }
+                            }
+                        });
+                        map.addLayer({
+                            id: layerId,
+                            type: 'line',
+                            source: sourceId,
+                            layout: { 'line-join': 'round', 'line-cap': 'round' },
+                            paint: {
+                                'line-color': dayColor,
+                                'line-width': 5,
+                                'line-opacity': 0.85
+                            }
+                        });
+                        polylinesRef.current[dayIndex] = [{ layerId, sourceId }];
+                    }
+                });
+
+                if (allCoords.length > 0) {
+                    const bounds = new mapboxRef.current.LngLatBounds(allCoords[0], allCoords[0]);
+                    for (const c of allCoords) bounds.extend(c);
+                    map.fitBounds(bounds, { padding: 80 });
+                }
+
+                if (selectedDay !== null) {
+                    // 触发一次可见性更新
+                    const event = { selectedDay }; // no-op
+                    updateVisibility(selectedDay);
+                }
+                return;
+            }
             const AMap = AMapRef.current;
 
-            if (!map || !AMap || !timeline || timeline.length === 0) return;
+            if (!AMap) return;
             // Removed isInitializedRef check to allow updates when timeline changes
 
             isInitializedRef.current = true;
@@ -453,17 +556,33 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         // Updated Helper: Set Active Marker - 精确2次跳动
         const setActiveMarkerImpl = useCallback((dayIndex: number, itemIndex: number) => {
             const map = mapInstance.current;
-            const AMap = AMapRef.current;
-
-            console.log('[Map] setActiveMarker called:', { dayIndex, itemIndex, mapReady: !!map, markersReady: !!markersRef.current[dayIndex]?.[itemIndex] });
-
-            if (!map || !AMap) {
+            if (!map) {
                 console.warn('[Map] Map not ready');
                 return;
             }
-
-            if (!markersRef.current[dayIndex]?.[itemIndex]) {
+            const marker = markersRef.current[dayIndex]?.[itemIndex];
+            if (!marker) {
                 console.warn('[Map] Marker not found:', { dayIndex, itemIndex });
+                return;
+            }
+            lastActiveMarkerRef.current = { dayIndex, itemIndex };
+
+            if (provider === 'mapbox') {
+                const item = timeline[dayIndex]?.items[itemIndex];
+                if (!item) return;
+                map.flyTo({ center: [item.location.lng, item.location.lat], zoom: 16, speed: 0.8 });
+                const el = marker.getElement?.();
+                if (el) {
+                    el.style.transition = 'transform 0.2s ease';
+                    el.style.transform = 'scale(1.2)';
+                    setTimeout(() => { el.style.transform = 'scale(1)'; }, 600);
+                }
+                return;
+            }
+
+            const AMap = AMapRef.current;
+            if (!AMap) {
+                console.warn('[Map] AMap not ready');
                 return;
             }
 
@@ -477,55 +596,53 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 }
             }
 
-            const marker = markersRef.current[dayIndex][itemIndex];
-            lastActiveMarkerRef.current = { dayIndex, itemIndex };
-
-            // 检查 marker 是否有必要的方法
             if (typeof marker.getPosition !== 'function') {
                 console.warn('[Map] Invalid marker object');
                 return;
             }
-
-            // 1. 平滑缩放和平移到标记位置
             const position = marker.getPosition();
-            console.log('[Map] Moving to position:', position);
             map.setZoomAndCenter(16, position, false, 500);
-
-            // 2. 置顶：设置最高 zIndex
             if (typeof marker.setZIndex === 'function') {
                 marker.setZIndex(9999);
             }
-
-            // 3. 跳动动画 - 使用 AMap 内置动画
             if (typeof marker.setAnimation === 'function') {
-                // 先停止可能存在的动画
                 marker.setAnimation('AMAP_ANIMATION_NONE');
-
-                // 地图移动后开始跳动动画
                 setTimeout(() => {
-                    console.log('[Map] Starting bounce animation');
                     marker.setAnimation('AMAP_ANIMATION_BOUNCE');
-
-                    // 1.5秒后停止
                     setTimeout(() => {
                         marker.setAnimation('AMAP_ANIMATION_NONE');
                     }, 1500);
                 }, 550);
             }
-
-        }, []);
+        }, [provider, timeline]);
 
         // 暴露方法
         const methods: MapContainerNewRef = {
             panToSpot: (dayIndex: number, itemIndex: number) => {
                 const map = mapInstance.current;
-                if (!map || !markersRef.current[dayIndex]?.[itemIndex]) return;
-                const marker = markersRef.current[dayIndex][itemIndex];
-                map.panTo(marker.getPosition());
+                if (!map) return;
+                if (provider === 'mapbox') {
+                    const item = timeline[dayIndex]?.items[itemIndex];
+                    if (!item) return;
+                    map.flyTo({ center: [item.location.lng, item.location.lat], zoom: 15 });
+                } else {
+                    if (!markersRef.current[dayIndex]?.[itemIndex]) return;
+                    const marker = markersRef.current[dayIndex][itemIndex];
+                    map.panTo(marker.getPosition());
+                }
             },
             highlightSpot: (dayIndex: number, itemIndex: number) => {
                 const marker = markersRef.current[dayIndex]?.[itemIndex];
-                if (marker) {
+                if (!marker) return;
+                if (provider === 'mapbox') {
+                    const el = marker.getElement?.();
+                    if (!el) return;
+                    el.style.transition = 'transform 0.2s ease';
+                    el.style.transform = 'scale(1.15)';
+                    setTimeout(() => {
+                        el.style.transform = 'scale(1)';
+                    }, 600);
+                } else {
                     marker.setAnimation('AMAP_ANIMATION_BOUNCE');
                     setTimeout(() => marker.setAnimation('AMAP_ANIMATION_NONE'), 1500);
                 }
@@ -540,9 +657,28 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 }
             },
             showAllDays: () => {
-                updateVisibility(null);
                 const map = mapInstance.current;
-                if (map) {
+                if (!map) return;
+                if (provider === 'mapbox') {
+                    const coords: [number, number][] = [];
+                    timeline.forEach(day => day.items.forEach(item => coords.push([item.location.lng, item.location.lat])));
+                    if (coords.length > 0) {
+                        const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
+                        for (const c of coords) bounds.extend(c);
+                        map.fitBounds(bounds, { padding: 80 });
+                    }
+                    // 显示全部
+                    markersRef.current.forEach(dayMarkers => dayMarkers.forEach((mk: any) => {
+                        const el = mk.getElement?.(); if (el) el.style.display = '';
+                    }));
+                    polylinesRef.current.forEach(dayLayers => {
+                        if (!dayLayers) return;
+                        dayLayers.forEach((item: any) => {
+                            try { map.setLayoutProperty(item.layerId, 'visibility', 'visible'); } catch {}
+                        });
+                    });
+                } else {
+                    updateVisibility(null);
                     const allMarkers = markersRef.current.flat();
                     if (allMarkers.length > 0) {
                         map.setFitView(allMarkers, false, [80, 80, 80, 80]);
@@ -550,11 +686,33 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 }
             },
             showDay: (dayIndex: number) => {
-                updateVisibility(dayIndex);
                 const map = mapInstance.current;
-                if (map && markersRef.current[dayIndex]) {
+                if (!map) return;
+                if (provider === 'mapbox') {
+                    // 仅显示该天
+                    markersRef.current.forEach((dayMarkers, idx) => {
+                        dayMarkers.forEach((mk: any) => {
+                            const el = mk.getElement?.();
+                            if (!el) return;
+                            el.style.display = (idx === dayIndex) ? '' : 'none';
+                        });
+                    });
+                    polylinesRef.current.forEach((dayLayers, idx) => {
+                        if (!dayLayers) return;
+                        dayLayers.forEach((item: any) => {
+                            try { map.setLayoutProperty(item.layerId, 'visibility', (idx === dayIndex) ? 'visible' : 'none'); } catch {}
+                        });
+                    });
+                    const coords: [number, number][] = timeline[dayIndex]?.items.map(i => [i.location.lng, i.location.lat]) || [];
+                    if (coords.length > 0) {
+                        const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
+                        for (const c of coords) bounds.extend(c);
+                        map.fitBounds(bounds, { padding: 80 });
+                    }
+                } else {
+                    updateVisibility(dayIndex);
                     const dayMarkers = markersRef.current[dayIndex];
-                    if (dayMarkers.length > 0) {
+                    if (dayMarkers && dayMarkers.length > 0) {
                         map.setFitView(dayMarkers, false, [80, 80, 80, 80]);
                     }
                 }
@@ -581,49 +739,73 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
             const initMap = async () => {
                 try {
-                    const AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
-
-                    const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
-                    if (!amapKey) {
-                        throw new Error('缺少高德地图 API Key');
-                    }
-
-                    const AMap = await AMapLoader.load({
-                        key: amapKey,
-                        version: '1.4.15',
-                        plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.InfoWindow'],
-                    });
-
-                    if (!isMounted || !mapContainerRef.current) return;
-
-                    AMapRef.current = AMap;
-
-                    const map = new AMap.Map(mapContainerRef.current, {
-                        zoom: 12,
-                        center: [118.089, 24.479],
-                        resizeEnable: true,
-                        mapStyle: 'amap://styles/normal',
-                    });
-
-                    mapInstance.current = map;
-
-                    map.on('complete', () => {
-                        if (isMounted) {
-                            setIsLoading(false);
-                            setMapReady(true);
+                    if (provider === 'mapbox') {
+                        const mapboxgl = (await import('mapbox-gl')).default;
+                        mapboxRef.current = mapboxgl;
+                        const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+                        if (!token) {
+                            throw new Error('缺少 Mapbox Token');
                         }
-                    });
+                        mapboxgl.accessToken = token;
+                        if (!isMounted || !mapContainerRef.current) return;
+                        const map = new mapboxgl.Map({
+                            container: mapContainerRef.current,
+                            style: 'mapbox://styles/mapbox/streets-v12',
+                            center: [118.089, 24.479],
+                            zoom: 12
+                        });
+                        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                        map.on('load', () => {
+                            if (isMounted) {
+                                setIsLoading(false);
+                                setMapReady(true);
+                            }
+                        });
+                        mapInstance.current = map;
+                    } else {
+                        const AMapLoader = (await import('@amap/amap-jsapi-loader')).default;
 
-                    // 添加控件 - 调整位置避免遮挡
-                    const scale = new AMap.Scale({ position: 'LT' });
-                    map.addControl(scale);
+                        const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
+                        if (!amapKey) {
+                            throw new Error('缺少高德地图 API Key');
+                        }
 
-                    const toolbar = new AMap.ToolBar({
-                        position: 'RT',
-                        liteStyle: true,
-                    });
-                    map.addControl(toolbar);
+                        const AMap = await AMapLoader.load({
+                            key: amapKey,
+                            version: '1.4.15',
+                            plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.InfoWindow'],
+                        });
 
+                        if (!isMounted || !mapContainerRef.current) return;
+
+                        AMapRef.current = AMap;
+
+                        const map = new AMap.Map(mapContainerRef.current, {
+                            zoom: 12,
+                            center: [118.089, 24.479],
+                            resizeEnable: true,
+                            mapStyle: 'amap://styles/normal',
+                        });
+
+                        mapInstance.current = map;
+
+                        map.on('complete', () => {
+                            if (isMounted) {
+                                setIsLoading(false);
+                                setMapReady(true);
+                            }
+                        });
+
+                        // 添加控件 - 调整位置避免遮挡
+                        const scale = new AMap.Scale({ position: 'LT' });
+                        map.addControl(scale);
+
+                        const toolbar = new AMap.ToolBar({
+                            position: 'RT',
+                            liteStyle: true,
+                        });
+                        map.addControl(toolbar);
+                    }
                 } catch (err) {
                     console.error('Map init error:', err);
                     if (isMounted) {
@@ -638,7 +820,11 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             return () => {
                 isMounted = false;
                 if (mapInstance.current) {
-                    mapInstance.current.destroy();
+                    if (provider === 'mapbox') {
+                        mapInstance.current.remove();
+                    } else {
+                        mapInstance.current.destroy();
+                    }
                     mapInstance.current = null;
                 }
                 isInitializedRef.current = false;
@@ -654,10 +840,34 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
         // 监听 selectedDay 变化更新可见性
         useEffect(() => {
-            if (mapReady && isInitializedRef.current) {
+            if (!mapReady || !isInitializedRef.current) return;
+            if (provider === 'mapbox') {
+                markersRef.current.forEach((dayMarkers, dayIndex) => {
+                    dayMarkers.forEach((mk: any) => {
+                        const el = mk.getElement?.();
+                        if (!el) return;
+                        if (selectedDay === null || selectedDay === dayIndex) {
+                            el.style.display = '';
+                        } else {
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+                polylinesRef.current.forEach((dayLayers, dayIndex) => {
+                    if (!dayLayers) return;
+                    dayLayers.forEach((item: any) => {
+                        const layerId = item.layerId;
+                        if (!layerId) return;
+                        const visibility = (selectedDay === null || selectedDay === dayIndex) ? 'visible' : 'none';
+                        try {
+                            mapInstance.current.setLayoutProperty(layerId, 'visibility', visibility);
+                        } catch {}
+                    });
+                });
+            } else {
                 updateVisibility(selectedDay);
             }
-        }, [selectedDay, mapReady, updateVisibility]);
+        }, [selectedDay, mapReady, updateVisibility, provider]);
 
         return (
             <div className="relative w-full h-full bg-slate-100">

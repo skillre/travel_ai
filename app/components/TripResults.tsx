@@ -119,6 +119,7 @@ export default function TripResults({ tripData }: TripResultsProps) {
                         ref={mapRef}
                         dailyPlan={legacyData.daily_plan}
                         onMarkerClick={handleMarkerClick}
+                        provider={legacyData.area && legacyData.area !== '中国大陆' ? 'mapbox' : 'amap'}
                     />
                 </div>
                 {/* 装饰性阴影 */}

@@ -262,6 +262,32 @@ export async function GET(
             );
         }
 
+        // 读取 Area 字段（Notion 数据库中的 Select，用于区分国内/海外）
+        let area: string | null = null;
+        try {
+            const areaProp = (page as any)?.properties?.Area;
+            area = areaProp?.select?.name || null;
+        } catch {
+            area = null;
+        }
+
+        // 将 Area 注入到返回的行程数据中（兼容新旧两种结构）
+        try {
+            if (area) {
+                if (planData && typeof planData === 'object') {
+                    if ('meta' in planData && planData.meta && typeof planData.meta === 'object') {
+                        // 新版 TripPlan 结构：注入到 meta
+                        (planData.meta as any).area = area;
+                    } else {
+                        // 旧版结构：作为顶层字段注入
+                        (planData as any).area = area;
+                    }
+                }
+            }
+        } catch (injectErr) {
+            console.warn('Inject Area into planData failed:', injectErr);
+        }
+
         // 获取标题
         let title = '';
         const titleProp = page.properties.Title || page.properties.Name;
@@ -273,6 +299,7 @@ export async function GET(
             success: true,
             data: planData,
             title: title,
+            area: area || undefined,
         }, {
             headers: {
                 'Cache-Control': 'no-store, no-cache, must-revalidate',
