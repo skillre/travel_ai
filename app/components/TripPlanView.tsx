@@ -175,12 +175,7 @@ export default function TripPlanView({ tripPlan }: TripPlanViewProps) {
     // 选择天数
     const handleSelectDay = useCallback((dayIndex: number | null) => {
         setSelectedDay(dayIndex);
-        if (dayIndex !== null) {
-            mapMethods?.showDay(dayIndex);
-        } else {
-            mapMethods?.showAllDays();
-        }
-    }, [mapMethods]);
+    }, []);
 
     // 统计数据
     const totalSpots = tripPlan.timeline.reduce(

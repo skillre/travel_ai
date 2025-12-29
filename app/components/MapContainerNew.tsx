@@ -47,6 +47,22 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const [error, setError] = useState<string | null>(null);
         const [mapReady, setMapReady] = useState(false);
 
+        const getFitPadding = useCallback(() => {
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+            if (isMobile) {
+                const screenH = typeof window !== 'undefined' ? window.innerHeight : 800;
+                const bottom = Math.max(260, Math.min(520, Math.round(screenH * 0.45)));
+                return {
+                    mapbox: { top: 140, right: 60, bottom, left: 60 },
+                    amap: [60, 140, 60, bottom] as [number, number, number, number],
+                };
+            }
+            return {
+                mapbox: { top: 80, right: 80, bottom: 80, left: 80 },
+                amap: [80, 80, 80, 80] as [number, number, number, number],
+            };
+        }, []);
+
         // 创建详情内容
         const createDetailContent = useCallback((day: TripPlanDay, item: TripPlanItem, dayIndex: number) => {
             const isFood = item.type === 'food';
@@ -205,7 +221,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         }, [timeline, createDetailContent]);
 
         // Helper to calculate distance
-        const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+        const calculateDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
             const R = 6371e3; // metres
             const φ1 = lat1 * Math.PI / 180;
             const φ2 = lat2 * Math.PI / 180;
@@ -218,10 +234,10 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
             return R * c; // in metres
-        };
+        }, []);
 
         // 计算预估时间
-        const getEstimatedTime = (distanceInMeters: number, isWalking: boolean) => {
+        const getEstimatedTime = useCallback((distanceInMeters: number, isWalking: boolean) => {
             if (isWalking) {
                 // 步行约 5km/h = 83m/min
                 const minutes = Math.round(distanceInMeters / 83);
@@ -231,13 +247,32 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 const minutes = Math.round(distanceInMeters / 500);
                 return minutes < 1 ? '1分钟' : `${minutes}分钟`;
             }
-        };
+        }, []);
 
         // 绘制标记和路线 - 只在初始化时调用一次
         const drawMarkersAndRoutes = useCallback(() => {
             const map = mapInstance.current;
             if (!map || !timeline || timeline.length === 0) return;
             if (provider === 'mapbox') {
+                markersRef.current.forEach(dayMarkers => dayMarkers?.forEach((mk: any) => {
+                    try { mk.remove?.(); } catch { }
+                }));
+                mapboxExtrasRef.current.forEach(dayMarkers => dayMarkers?.forEach((mk: any) => {
+                    try { mk.remove?.(); } catch { }
+                }));
+                polylinesRef.current.forEach(dayLayers => {
+                    dayLayers?.forEach((item: any) => {
+                        const layerId = item?.layerId;
+                        const sourceId = item?.sourceId;
+                        if (layerId && map.getLayer?.(layerId)) {
+                            try { map.removeLayer(layerId); } catch { }
+                        }
+                        if (sourceId && map.getSource?.(sourceId)) {
+                            try { map.removeSource(sourceId); } catch { }
+                        }
+                    });
+                });
+
                 const animateTwoBounces = (target: HTMLElement) => {
                     target.style.transition = 'transform 0.18s ease';
                     target.style.transform = 'translateZ(0) scale(1.18)';
@@ -371,7 +406,9 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                         dayMarkers.push(marker);
                         pathCoords.push([item.location.lng, item.location.lat]);
-                        allCoords.push([item.location.lng, item.location.lat]);
+                        if (item.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                            allCoords.push([item.location.lng, item.location.lat]);
+                        }
 
                         // 路线中点交通图标与用时
                         if (prevItem) {
@@ -444,11 +481,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 });
 
                 if (allCoords.length > 0) {
+                    const { mapbox: padding } = getFitPadding();
                     const bounds = new mapboxRef.current.LngLatBounds(allCoords[0], allCoords[0]);
                     for (const c of allCoords) bounds.extend(c);
-                    map.fitBounds(bounds, { padding: 80, duration: 0 });
+                    map.fitBounds(bounds, { padding, duration: 0, maxZoom: 16 });
                 }
 
+                isInitializedRef.current = true;
                 if (selectedDay !== null) {
                     updateVisibility(selectedDay);
                 }
@@ -661,14 +700,15 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             });
 
             if (allMarkers.length > 0) {
-                map.setFitView(allMarkers, true, [80, 80, 80, 80]);
+                const { amap: padding } = getFitPadding();
+                map.setFitView(allMarkers, true, padding);
             }
 
             // 应用初始筛选
             if (selectedDay !== null) {
                 updateVisibility(selectedDay);
             }
-        }, [timeline, onMarkerClick, selectedDay, updateVisibility, showItemDetailOnMap]);
+        }, [timeline, onMarkerClick, selectedDay, updateVisibility, showItemDetailOnMap, provider, calculateDistance, getEstimatedTime, getFitPadding]);
 
         // 跟踪上一个激活的 marker
         const lastActiveMarkerRef = useRef<{ dayIndex: number, itemIndex: number } | null>(null);
@@ -786,12 +826,17 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 const map = mapInstance.current;
                 if (!map) return;
                 if (provider === 'mapbox') {
+                    const { mapbox: padding } = getFitPadding();
                     const coords: [number, number][] = [];
-                    timeline.forEach(day => day.items.forEach(item => coords.push([item.location.lng, item.location.lat])));
+                    timeline.forEach(day => day.items.forEach(item => {
+                        if (item?.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                            coords.push([item.location.lng, item.location.lat]);
+                        }
+                    }));
                     if (coords.length > 0) {
                         const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
                         for (const c of coords) bounds.extend(c);
-                        map.fitBounds(bounds, { padding: 80, duration: 0 });
+                        map.fitBounds(bounds, { padding, duration: 0, maxZoom: 16 });
                     }
                     // 显示全部
                     markersRef.current.forEach(dayMarkers => dayMarkers.forEach((mk: any) => {
@@ -810,7 +855,8 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     updateVisibility(null);
                     const allMarkers = markersRef.current.flat();
                     if (allMarkers.length > 0) {
-                        map.setFitView(allMarkers, true, [80, 80, 80, 80]);
+                        const { amap: padding } = getFitPadding();
+                        map.setFitView(allMarkers, true, padding);
                     }
                 }
             },
@@ -818,6 +864,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 const map = mapInstance.current;
                 if (!map) return;
                 if (provider === 'mapbox') {
+                    const { mapbox: padding } = getFitPadding();
                     // 仅显示该天
                     markersRef.current.forEach((dayMarkers, idx) => {
                         dayMarkers.forEach((mk: any) => {
@@ -839,17 +886,23 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             try { map.setLayoutProperty(item.layerId, 'visibility', (idx === dayIndex) ? 'visible' : 'none'); } catch {}
                         });
                     });
-                    const coords: [number, number][] = timeline[dayIndex]?.items.map(i => [i.location.lng, i.location.lat]) || [];
+                    const coords: [number, number][] = [];
+                    (timeline[dayIndex]?.items || []).forEach(i => {
+                        if (i?.location && (i.location.lng !== 0 || i.location.lat !== 0)) {
+                            coords.push([i.location.lng, i.location.lat]);
+                        }
+                    });
                     if (coords.length > 0) {
                         const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
                         for (const c of coords) bounds.extend(c);
-                        map.fitBounds(bounds, { padding: 80, duration: 0 });
+                        map.fitBounds(bounds, { padding, duration: 0, maxZoom: 16 });
                     }
                 } else {
                     updateVisibility(dayIndex);
                     const dayMarkers = markersRef.current[dayIndex];
                     if (dayMarkers && dayMarkers.length > 0) {
-                        map.setFitView(dayMarkers, true, [80, 80, 80, 80]);
+                        const { amap: padding } = getFitPadding();
+                        map.setFitView(dayMarkers, true, padding);
                     }
                 }
             },
@@ -1036,6 +1089,10 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         useEffect(() => {
             if (!mapReady || !isInitializedRef.current) return;
             if (provider === 'mapbox') {
+                if (mapboxHoverPopupRef.current) {
+                    try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                    mapboxHoverPopupRef.current = null;
+                }
                 markersRef.current.forEach((dayMarkers, dayIndex) => {
                     dayMarkers.forEach((mk: any) => {
                         const el = mk.getElement?.();
@@ -1070,10 +1127,54 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         } catch {}
                     });
                 });
+
+                const map = mapInstance.current;
+                if (map) {
+                    const { mapbox: padding } = getFitPadding();
+                    const coords: [number, number][] = [];
+                    if (selectedDay === null) {
+                        timeline.forEach(day => day.items.forEach(item => {
+                            if (item?.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                                coords.push([item.location.lng, item.location.lat]);
+                            }
+                        }));
+                    } else {
+                        timeline[selectedDay]?.items.forEach(item => {
+                            if (item?.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                                coords.push([item.location.lng, item.location.lat]);
+                            }
+                        });
+                    }
+                    if (coords.length > 0) {
+                        const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
+                        for (const c of coords) bounds.extend(c);
+                        map.fitBounds(bounds, { padding, duration: 0, maxZoom: 16 });
+                    }
+                }
             } else {
+                if (hoverInfoWindowRef.current) {
+                    hoverInfoWindowRef.current.close?.();
+                    hoverInfoWindowRef.current = null;
+                }
                 updateVisibility(selectedDay);
+                const map = mapInstance.current;
+                const AMap = AMapRef.current;
+                if (map && AMap) {
+                    const { amap: padding } = getFitPadding();
+                    if (selectedDay === null) {
+                        const allMarkers = markersRef.current.flat();
+                        if (allMarkers.length > 0) {
+                            map.setFitView(allMarkers, true, padding);
+                        }
+                    } else {
+                        const dayMarkers = markersRef.current[selectedDay];
+                        if (dayMarkers && dayMarkers.length > 0) {
+                            map.setFitView(dayMarkers, true, padding);
+                        }
+                    }
+                }
             }
-        }, [selectedDay, mapReady, updateVisibility, provider]);
+        }, [selectedDay, mapReady, updateVisibility, provider, timeline, getFitPadding]);
 
         return (
             <div className="relative w-full h-full bg-slate-100">
