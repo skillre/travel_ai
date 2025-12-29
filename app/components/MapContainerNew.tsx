@@ -308,6 +308,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         outerEl.style.width = '32px';
                         outerEl.style.height = '40px';
                         outerEl.style.cursor = 'pointer';
+                        outerEl.style.zIndex = '2';
 
                         const animEl = document.createElement('div');
                         animEl.style.width = '32px';
@@ -418,23 +419,29 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             );
                             const isWalking = distance < 2000;
                             const estimatedTime = getEstimatedTime(distance, isWalking);
-                            const midLat = (prevItem.location.lat + item.location.lat) / 2;
-                            const midLng = (prevItem.location.lng + item.location.lng) / 2;
+                            const distanceText = distance < 1000
+                                ? `${Math.round(distance)}m`
+                                : `${(distance / 1000).toFixed(1)}km`;
+                            const t = (itemIndex % 2 === 0) ? 0.42 : 0.58;
+                            const midLat = prevItem.location.lat + (item.location.lat - prevItem.location.lat) * t;
+                            const midLng = prevItem.location.lng + (item.location.lng - prevItem.location.lng) * t;
 
                             const midEl = document.createElement('div');
                             midEl.style.display = 'inline-flex';
                             midEl.style.flexDirection = 'column';
                             midEl.style.alignItems = 'center';
                             midEl.style.gap = '2px';
+                            midEl.style.pointerEvents = 'none';
+                            midEl.style.zIndex = '1';
                             midEl.innerHTML = `
                                 <div style="background:white;padding:4px 6px;border-radius:12px;
                                     box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">
                                     ${isWalking ? '🚶' : '🚗'}
                                 </div>
                                 <div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;
-                                    font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime}</div>
+                                    font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div>
                             `;
-                            const midMarker = new mapboxRef.current.Marker({ element: midEl, offset: [-20, -25] })
+                            const midMarker = new mapboxRef.current.Marker({ element: midEl, anchor: 'center' })
                                 .setLngLat([midLng, midLat])
                                 .addTo(map);
                             dayExtras.push(midMarker);
@@ -680,9 +687,12 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         dayPolylines.push(polyline);
 
                         // 2. Draw Transport Icon at Midpoint - 简洁的设计
-                        const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;"><div style="background:white;padding:4px 6px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime}</div></div>`;
+                        const t = (itemIndex % 2 === 0) ? 0.42 : 0.58;
+                        const posLat = prevItem.location.lat + (item.location.lat - prevItem.location.lat) * t;
+                        const posLng = prevItem.location.lng + (item.location.lng - prevItem.location.lng) * t;
+                        const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;"><div style="background:white;padding:4px 6px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div></div>`;
                         const midMarker = new AMap.Marker({
-                            position: new AMap.LngLat(midLng, midLat),
+                            position: new AMap.LngLat(posLng, posLat),
                             content: transportIconContent,
                             offset: new AMap.Pixel(-20, -25),
                             zIndex: 20,
