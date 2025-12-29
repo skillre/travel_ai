@@ -107,6 +107,7 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
     const containerWidth = 1600; // Wide landscape (16:9)
     const containerHeight = 900;
     const amapKey = process.env.NEXT_PUBLIC_AMAP_KEY;
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
     const allSpots: { item: TripPlanItem, dayIndex: number, index: number, globalIndex: number }[] = [];
     let globalIndex = 0;
@@ -138,7 +139,9 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
 
     let staticMapUrl = '';
 
-    if (bounds && allSpots.length > 0 && amapKey) {
+    const isOverseas = tripPlan.meta.area && tripPlan.meta.area !== '中国大陆';
+
+    if (bounds && allSpots.length > 0 && (isOverseas ? mapboxToken : amapKey)) {
         const zoom = getZoom(bounds, containerWidth, containerHeight);
         const center = getCenter(bounds);
 
@@ -149,7 +152,13 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
 
         mapParams = { bounds, zoom, center, centerPoint };
 
-        staticMapUrl = `https://restapi.amap.com/v3/staticmap?location=${center.lng.toFixed(6)},${center.lat.toFixed(6)}&zoom=${zoom}&size=1024*576&scale=2&key=${amapKey}`;
+        if (isOverseas) {
+            const width = 1024;
+            const height = 576;
+            staticMapUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${center.lng.toFixed(6)},${center.lat.toFixed(6)},${zoom},0/${width}x${height}@2x?access_token=${mapboxToken}`;
+        } else {
+            staticMapUrl = `https://restapi.amap.com/v3/staticmap?location=${center.lng.toFixed(6)},${center.lat.toFixed(6)}&zoom=${zoom}&size=1024*576&scale=2&key=${amapKey}`;
+        }
 
         markers = allSpots.map(spot => {
             const point = latLngToPoint(spot.item.location.lat, spot.item.location.lng, zoom);
@@ -337,7 +346,7 @@ export default function TripRouteMapView({ tripPlan, className = '', id }: TripR
 
                 <div className="text-center mt-2">
                     <span className="text-[10px] text-slate-400 font-medium tracking-wide">
-                        POWERED BY AMAP • AI TRAVEL PLANNER
+                        {isOverseas ? 'POWERED BY MAPBOX' : 'POWERED BY AMAP'} • AI TRAVEL PLANNER
                     </span>
                 </div>
             </div>

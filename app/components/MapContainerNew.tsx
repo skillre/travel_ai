@@ -37,6 +37,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const mapboxRef = useRef<any>(null);
         const markersRef = useRef<any[][]>([]);
         const polylinesRef = useRef<any[][]>([]); // 按天分组存储路线和交通图标
+        const mapboxExtrasRef = useRef<any[][]>([]); // Mapbox 额外标记（如中点交通图标）
         const hoverInfoWindowRef = useRef<any>(null);
         const detailInfoWindowRef = useRef<any>(null);
         const isInitializedRef = useRef(false);
@@ -236,33 +237,92 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const map = mapInstance.current;
             if (!map || !timeline || timeline.length === 0) return;
             if (provider === 'mapbox') {
-                // Mapbox 渲染
                 markersRef.current = [];
                 polylinesRef.current = [];
+                mapboxExtrasRef.current = [];
                 const allCoords: [number, number][] = [];
 
                 timeline.forEach((day, dayIndex) => {
                     const dayColor = dayColors[dayIndex % dayColors.length];
                     const dayMarkers: any[] = [];
+                    const dayExtras: any[] = [];
                     const pathCoords: [number, number][] = [];
 
-                    day.items.forEach((item, itemIndex) => {
-                        const el = document.createElement('div');
-                        el.style.background = '#0d9488';
-                        el.style.color = 'white';
-                        el.style.padding = '6px 10px';
-                        el.style.borderRadius = '16px';
-                        el.style.fontSize = '12px';
-                        el.style.fontWeight = 'bold';
-                        el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                        el.style.border = '2px solid rgba(255,255,255,0.3)';
-                        el.style.cursor = 'pointer';
-                        el.innerHTML = `${item.emoji || ''} ${item.title}`;
+                    let prevItem: TripPlanItem | null = null;
 
-                        const marker = new mapboxRef.current.Marker({ element: el })
+                    day.items.forEach((item, itemIndex) => {
+                        const isFood = item.type === 'food';
+                        const markerColor = isFood ? '#f97316' : '#0d9488';
+
+                        const el = document.createElement('div');
+                        el.style.width = '32px';
+                        el.style.height = '40px';
+                        el.style.position = 'relative';
+                        el.style.cursor = 'pointer';
+                        el.style.transform = 'translateZ(0)';
+                        el.innerHTML = `
+                            <div style="
+                                position:absolute;top:0;left:50%;
+                                width:28px;height:28px;margin-left:-14px;
+                                background:${markerColor};
+                                border-radius:50% 50% 50% 0;
+                                transform:rotate(-45deg);
+                                box-shadow:0 3px 10px rgba(0,0,0,0.35);
+                                border:2.5px solid white;
+                            ">
+                                <div style="
+                                    position:absolute;top:50%;left:50%;
+                                    transform:translate(-50%,-50%) rotate(45deg);
+                                    color:white;font-weight:bold;font-size:12px;
+                                    text-shadow:0 1px 2px rgba(0,0,0,0.3);
+                                ">${itemIndex + 1}</div>
+                            </div>
+                        `;
+
+                        const marker = new mapboxRef.current.Marker({ element: el, offset: [0, -20] })
                             .setLngLat([item.location.lng, item.location.lat])
                             .addTo(map);
 
+                        // Hover：显示名称并双次跳动
+                        const handleHover = () => {
+                            try {
+                                const popupHtml = `
+                                    <div style="padding:10px 14px;background:white;border-radius:12px;
+                                        box-shadow:0 8px 24px rgba(0,0,0,0.2);font-family:system-ui;
+                                        min-width:140px;max-width:240px;border:1px solid rgba(0,0,0,0.05)">
+                                        <div style="display:flex;align-items:center;gap:10px;">
+                                            <div style="width:36px;height:36px;background:${isFood ? '#fff7ed' : '#f0fdfa'};
+                                                border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;">
+                                                ${item.emoji || (isFood ? '🍽️' : '📍')}
+                                            </div>
+                                            <div>
+                                                <div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1.2;margin-bottom:2px;">
+                                                    ${item.title}
+                                                </div>
+                                                <div style="font-size:11px;color:#64748b;display:flex;align-items:center;gap:4px;">
+                                                    <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${dayColor};"></span>
+                                                    Day ${day.day} · ${item.time_label || ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                new mapboxRef.current.Popup({ offset: [0, -28], closeButton: false })
+                                    .setLngLat([item.location.lng, item.location.lat])
+                                    .setHTML(popupHtml)
+                                    .addTo(map);
+                            } catch {}
+                            el.style.transition = 'transform 0.18s ease';
+                            el.style.transform = 'translateZ(0) scale(1.18)';
+                            setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                            setTimeout(() => {
+                                el.style.transform = 'translateZ(0) scale(1.18)';
+                                setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                            }, 220);
+                        };
+                        el.addEventListener('mouseenter', handleHover);
+
+                        // 点击联动详情
                         el.addEventListener('click', () => {
                             const html = `
                                 <div style="padding:16px;min-width:240px;max-width:320px;font-family:system-ui">
@@ -283,9 +343,42 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         dayMarkers.push(marker);
                         pathCoords.push([item.location.lng, item.location.lat]);
                         allCoords.push([item.location.lng, item.location.lat]);
+
+                        // 路线中点交通图标与用时
+                        if (prevItem) {
+                            const distance = calculateDistance(
+                                prevItem.location.lat, prevItem.location.lng,
+                                item.location.lat, item.location.lng
+                            );
+                            const isWalking = distance < 2000;
+                            const estimatedTime = getEstimatedTime(distance, isWalking);
+                            const midLat = (prevItem.location.lat + item.location.lat) / 2;
+                            const midLng = (prevItem.location.lng + item.location.lng) / 2;
+
+                            const midEl = document.createElement('div');
+                            midEl.style.display = 'inline-flex';
+                            midEl.style.flexDirection = 'column';
+                            midEl.style.alignItems = 'center';
+                            midEl.style.gap = '2px';
+                            midEl.innerHTML = `
+                                <div style="background:white;padding:4px 6px;border-radius:12px;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">
+                                    ${isWalking ? '🚶' : '🚗'}
+                                </div>
+                                <div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;
+                                    font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime}</div>
+                            `;
+                            const midMarker = new mapboxRef.current.Marker({ element: midEl, offset: [-20, -25] })
+                                .setLngLat([midLng, midLat])
+                                .addTo(map);
+                            dayExtras.push(midMarker);
+                        }
+
+                        prevItem = item;
                     });
 
                     markersRef.current.push(dayMarkers);
+                    mapboxExtrasRef.current[dayIndex] = dayExtras;
 
                     if (pathCoords.length > 1) {
                         const sourceId = `route-src-${dayIndex}`;
@@ -328,8 +421,6 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 }
 
                 if (selectedDay !== null) {
-                    // 触发一次可见性更新
-                    const event = { selectedDay }; // no-op
                     updateVisibility(selectedDay);
                 }
                 return;
@@ -573,9 +664,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 map.flyTo({ center: [item.location.lng, item.location.lat], zoom: 16, speed: 0.8 });
                 const el = marker.getElement?.();
                 if (el) {
-                    el.style.transition = 'transform 0.2s ease';
-                    el.style.transform = 'scale(1.2)';
-                    setTimeout(() => { el.style.transform = 'scale(1)'; }, 600);
+                    el.style.transition = 'transform 0.18s ease';
+                    el.style.transform = 'translateZ(0) scale(1.18)';
+                    setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                    setTimeout(() => {
+                        el.style.transform = 'translateZ(0) scale(1.18)';
+                        setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                    }, 220);
                 }
                 return;
             }
@@ -733,9 +828,33 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         }, [mapReady, onReady]);
 
 
-        // 初始化地图
         useEffect(() => {
             let isMounted = true;
+
+            setMapReady(false);
+            setIsLoading(true);
+            setError(null);
+            markersRef.current = [];
+            polylinesRef.current = [];
+            if (hoverInfoWindowRef.current) {
+                hoverInfoWindowRef.current.close?.();
+                hoverInfoWindowRef.current = null;
+            }
+            if (detailInfoWindowRef.current) {
+                detailInfoWindowRef.current.close?.();
+                detailInfoWindowRef.current = null;
+            }
+            if (mapInstance.current) {
+                try {
+                    if (provider === 'mapbox') {
+                        mapInstance.current.remove?.();
+                    } else {
+                        mapInstance.current.destroy?.();
+                    }
+                } catch {}
+                mapInstance.current = null;
+            }
+            isInitializedRef.current = false;
 
             const initMap = async () => {
                 try {
@@ -820,16 +939,18 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             return () => {
                 isMounted = false;
                 if (mapInstance.current) {
-                    if (provider === 'mapbox') {
-                        mapInstance.current.remove();
-                    } else {
-                        mapInstance.current.destroy();
-                    }
+                    try {
+                        if (provider === 'mapbox') {
+                            mapInstance.current.remove?.();
+                        } else {
+                            mapInstance.current.destroy?.();
+                        }
+                    } catch {}
                     mapInstance.current = null;
                 }
                 isInitializedRef.current = false;
             };
-        }, []);
+        }, [provider]);
 
         // 地图准备好后绘制
         useEffect(() => {
@@ -844,6 +965,18 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             if (provider === 'mapbox') {
                 markersRef.current.forEach((dayMarkers, dayIndex) => {
                     dayMarkers.forEach((mk: any) => {
+                        const el = mk.getElement?.();
+                        if (!el) return;
+                        if (selectedDay === null || selectedDay === dayIndex) {
+                            el.style.display = '';
+                        } else {
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+                mapboxExtrasRef.current.forEach((extras, dayIndex) => {
+                    if (!extras) return;
+                    extras.forEach((mk: any) => {
                         const el = mk.getElement?.();
                         if (!el) return;
                         if (selectedDay === null || selectedDay === dayIndex) {
