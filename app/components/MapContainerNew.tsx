@@ -38,6 +38,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const markersRef = useRef<any[][]>([]);
         const polylinesRef = useRef<any[][]>([]); // 按天分组存储路线和交通图标
         const mapboxExtrasRef = useRef<any[][]>([]); // Mapbox 额外标记（如中点交通图标）
+        const mapboxHoverPopupRef = useRef<any>(null);
         const hoverInfoWindowRef = useRef<any>(null);
         const detailInfoWindowRef = useRef<any>(null);
         const isInitializedRef = useRef(false);
@@ -237,9 +238,23 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             const map = mapInstance.current;
             if (!map || !timeline || timeline.length === 0) return;
             if (provider === 'mapbox') {
+                const animateTwoBounces = (target: HTMLElement) => {
+                    target.style.transition = 'transform 0.18s ease';
+                    target.style.transform = 'translateZ(0) scale(1.18)';
+                    setTimeout(() => { target.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                    setTimeout(() => {
+                        target.style.transform = 'translateZ(0) scale(1.18)';
+                        setTimeout(() => { target.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                    }, 220);
+                };
+
                 markersRef.current = [];
                 polylinesRef.current = [];
                 mapboxExtrasRef.current = [];
+                if (mapboxHoverPopupRef.current) {
+                    try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                    mapboxHoverPopupRef.current = null;
+                }
                 const allCoords: [number, number][] = [];
 
                 timeline.forEach((day, dayIndex) => {
@@ -254,13 +269,18 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         const isFood = item.type === 'food';
                         const markerColor = isFood ? '#f97316' : '#0d9488';
 
-                        const el = document.createElement('div');
-                        el.style.width = '32px';
-                        el.style.height = '40px';
-                        el.style.position = 'relative';
-                        el.style.cursor = 'pointer';
-                        el.style.transform = 'translateZ(0)';
-                        el.innerHTML = `
+                        const outerEl = document.createElement('div');
+                        outerEl.style.width = '32px';
+                        outerEl.style.height = '40px';
+                        outerEl.style.cursor = 'pointer';
+
+                        const animEl = document.createElement('div');
+                        animEl.style.width = '32px';
+                        animEl.style.height = '40px';
+                        animEl.style.position = 'relative';
+                        animEl.style.transformOrigin = '50% 100%';
+                        animEl.style.transform = 'translateZ(0)';
+                        animEl.innerHTML = `
                             <div style="
                                 position:absolute;top:0;left:50%;
                                 width:28px;height:28px;margin-left:-14px;
@@ -278,13 +298,18 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                                 ">${itemIndex + 1}</div>
                             </div>
                         `;
+                        outerEl.appendChild(animEl);
 
-                        const marker = new mapboxRef.current.Marker({ element: el, offset: [0, -20] })
+                        const marker = new mapboxRef.current.Marker({ element: outerEl, offset: [0, -20] })
                             .setLngLat([item.location.lng, item.location.lat])
                             .addTo(map);
 
                         // Hover：显示名称并双次跳动
                         const handleHover = () => {
+                            if (mapboxHoverPopupRef.current) {
+                                try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                                mapboxHoverPopupRef.current = null;
+                            }
                             try {
                                 const popupHtml = `
                                     <div style="padding:10px 14px;background:white;border-radius:12px;
@@ -307,23 +332,27 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                                         </div>
                                     </div>
                                 `;
-                                new mapboxRef.current.Popup({ offset: [0, -28], closeButton: false })
+                                mapboxHoverPopupRef.current = new mapboxRef.current.Popup({ offset: [0, -28], closeButton: false, closeOnClick: true })
                                     .setLngLat([item.location.lng, item.location.lat])
                                     .setHTML(popupHtml)
                                     .addTo(map);
                             } catch {}
-                            el.style.transition = 'transform 0.18s ease';
-                            el.style.transform = 'translateZ(0) scale(1.18)';
-                            setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
-                            setTimeout(() => {
-                                el.style.transform = 'translateZ(0) scale(1.18)';
-                                setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
-                            }, 220);
+                            animateTwoBounces(animEl);
                         };
-                        el.addEventListener('mouseenter', handleHover);
+                        outerEl.addEventListener('mouseenter', handleHover);
+                        outerEl.addEventListener('mouseleave', () => {
+                            if (mapboxHoverPopupRef.current) {
+                                try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                                mapboxHoverPopupRef.current = null;
+                            }
+                        });
 
                         // 点击联动详情
-                        el.addEventListener('click', () => {
+                        outerEl.addEventListener('click', () => {
+                            if (mapboxHoverPopupRef.current) {
+                                try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                                mapboxHoverPopupRef.current = null;
+                            }
                             const html = `
                                 <div style="padding:16px;min-width:240px;max-width:320px;font-family:system-ui">
                                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -417,7 +446,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 if (allCoords.length > 0) {
                     const bounds = new mapboxRef.current.LngLatBounds(allCoords[0], allCoords[0]);
                     for (const c of allCoords) bounds.extend(c);
-                    map.fitBounds(bounds, { padding: 80 });
+                    map.fitBounds(bounds, { padding: 80, duration: 0 });
                 }
 
                 if (selectedDay !== null) {
@@ -632,7 +661,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             });
 
             if (allMarkers.length > 0) {
-                map.setFitView(allMarkers, false, [80, 80, 80, 80]);
+                map.setFitView(allMarkers, true, [80, 80, 80, 80]);
             }
 
             // 应用初始筛选
@@ -663,13 +692,14 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 if (!item) return;
                 map.flyTo({ center: [item.location.lng, item.location.lat], zoom: 16, speed: 0.8 });
                 const el = marker.getElement?.();
-                if (el) {
-                    el.style.transition = 'transform 0.18s ease';
-                    el.style.transform = 'translateZ(0) scale(1.18)';
-                    setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                const target = el?.firstElementChild as HTMLElement | null;
+                if (target) {
+                    target.style.transition = 'transform 0.18s ease';
+                    target.style.transform = 'translateZ(0) scale(1.18)';
+                    setTimeout(() => { target.style.transform = 'translateZ(0) scale(1)'; }, 180);
                     setTimeout(() => {
-                        el.style.transform = 'translateZ(0) scale(1.18)';
-                        setTimeout(() => { el.style.transform = 'translateZ(0) scale(1)'; }, 180);
+                        target.style.transform = 'translateZ(0) scale(1.18)';
+                        setTimeout(() => { target.style.transform = 'translateZ(0) scale(1)'; }, 180);
                     }, 220);
                 }
                 return;
@@ -731,11 +761,12 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 if (!marker) return;
                 if (provider === 'mapbox') {
                     const el = marker.getElement?.();
-                    if (!el) return;
-                    el.style.transition = 'transform 0.2s ease';
-                    el.style.transform = 'scale(1.15)';
+                    const target = el?.firstElementChild as HTMLElement | null;
+                    if (!target) return;
+                    target.style.transition = 'transform 0.2s ease';
+                    target.style.transform = 'translateZ(0) scale(1.15)';
                     setTimeout(() => {
-                        el.style.transform = 'scale(1)';
+                        target.style.transform = 'translateZ(0) scale(1)';
                     }, 600);
                 } else {
                     marker.setAnimation('AMAP_ANIMATION_BOUNCE');
@@ -760,10 +791,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     if (coords.length > 0) {
                         const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
                         for (const c of coords) bounds.extend(c);
-                        map.fitBounds(bounds, { padding: 80 });
+                        map.fitBounds(bounds, { padding: 80, duration: 0 });
                     }
                     // 显示全部
                     markersRef.current.forEach(dayMarkers => dayMarkers.forEach((mk: any) => {
+                        const el = mk.getElement?.(); if (el) el.style.display = '';
+                    }));
+                    mapboxExtrasRef.current.forEach(dayMarkers => dayMarkers?.forEach((mk: any) => {
                         const el = mk.getElement?.(); if (el) el.style.display = '';
                     }));
                     polylinesRef.current.forEach(dayLayers => {
@@ -776,7 +810,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     updateVisibility(null);
                     const allMarkers = markersRef.current.flat();
                     if (allMarkers.length > 0) {
-                        map.setFitView(allMarkers, false, [80, 80, 80, 80]);
+                        map.setFitView(allMarkers, true, [80, 80, 80, 80]);
                     }
                 }
             },
@@ -792,6 +826,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             el.style.display = (idx === dayIndex) ? '' : 'none';
                         });
                     });
+                    mapboxExtrasRef.current.forEach((dayMarkers, idx) => {
+                        dayMarkers?.forEach((mk: any) => {
+                            const el = mk.getElement?.();
+                            if (!el) return;
+                            el.style.display = (idx === dayIndex) ? '' : 'none';
+                        });
+                    });
                     polylinesRef.current.forEach((dayLayers, idx) => {
                         if (!dayLayers) return;
                         dayLayers.forEach((item: any) => {
@@ -802,13 +843,13 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     if (coords.length > 0) {
                         const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
                         for (const c of coords) bounds.extend(c);
-                        map.fitBounds(bounds, { padding: 80 });
+                        map.fitBounds(bounds, { padding: 80, duration: 0 });
                     }
                 } else {
                     updateVisibility(dayIndex);
                     const dayMarkers = markersRef.current[dayIndex];
                     if (dayMarkers && dayMarkers.length > 0) {
-                        map.setFitView(dayMarkers, false, [80, 80, 80, 80]);
+                        map.setFitView(dayMarkers, true, [80, 80, 80, 80]);
                     }
                 }
             },
@@ -829,13 +870,14 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
 
         useEffect(() => {
-            let isMounted = true;
+            let isMounted = true
 
             setMapReady(false);
             setIsLoading(true);
             setError(null);
             markersRef.current = [];
             polylinesRef.current = [];
+            mapboxExtrasRef.current = [];
             if (hoverInfoWindowRef.current) {
                 hoverInfoWindowRef.current.close?.();
                 hoverInfoWindowRef.current = null;
@@ -843,6 +885,10 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
             if (detailInfoWindowRef.current) {
                 detailInfoWindowRef.current.close?.();
                 detailInfoWindowRef.current = null;
+            }
+            if (mapboxHoverPopupRef.current) {
+                try { mapboxHoverPopupRef.current.remove?.(); } catch { }
+                mapboxHoverPopupRef.current = null;
             }
             if (mapInstance.current) {
                 try {
@@ -867,10 +913,24 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         }
                         mapboxgl.accessToken = token;
                         if (!isMounted || !mapContainerRef.current) return;
+
+                        let initialCenter: [number, number] = [118.089, 24.479];
+                        let hasInitial = false;
+                        for (const day of timeline || []) {
+                            for (const item of day.items || []) {
+                                if (item?.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                                    initialCenter = [item.location.lng, item.location.lat];
+                                    hasInitial = true;
+                                    break;
+                                }
+                            }
+                            if (hasInitial) break;
+                        }
+
                         const map = new mapboxgl.Map({
                             container: mapContainerRef.current,
                             style: 'mapbox://styles/mapbox/streets-v12',
-                            center: [118.089, 24.479],
+                            center: initialCenter,
                             zoom: 12
                         });
                         map.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -899,9 +959,22 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
 
                         AMapRef.current = AMap;
 
+                        let initialCenter: [number, number] = [118.089, 24.479];
+                        let found = false;
+                        for (const day of timeline || []) {
+                            for (const item of day.items || []) {
+                                if (item?.location && (item.location.lng !== 0 || item.location.lat !== 0)) {
+                                    initialCenter = [item.location.lng, item.location.lat];
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (found) break;
+                        }
+
                         const map = new AMap.Map(mapContainerRef.current, {
                             zoom: 12,
-                            center: [118.089, 24.479],
+                            center: initialCenter,
                             resizeEnable: true,
                             mapStyle: 'amap://styles/normal',
                         });
