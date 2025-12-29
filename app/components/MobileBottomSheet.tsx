@@ -27,8 +27,10 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
     const [translateY, setTranslateY] = useState(0);
 
     const handleRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const startYRef = useRef(0);
     const lastYRef = useRef(0);
+    const dragFromContentRef = useRef(false);
 
     // 锁定背景滚动
     useEffect(() => {
@@ -51,6 +53,7 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
         const touch = e.touches[0];
         startYRef.current = touch.clientY;
         lastYRef.current = touch.clientY;
+        dragFromContentRef.current = false;
         setIsDragging(true);
     }, [sheetState]);
 
@@ -85,6 +88,46 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
         setTranslateY(0);
     }, [isDragging, sheetState, translateY]);
 
+    const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
+        if (sheetState === 'hidden') return;
+        const touch = e.touches[0];
+        startYRef.current = touch.clientY;
+        lastYRef.current = touch.clientY;
+        dragFromContentRef.current = false;
+    }, [sheetState]);
+
+    const handleContentTouchMove = useCallback((e: React.TouchEvent) => {
+        if (sheetState === 'hidden') return;
+        const touch = e.touches[0];
+        const deltaY = touch.clientY - startYRef.current;
+        lastYRef.current = touch.clientY;
+
+        const contentEl = contentRef.current;
+        const atTop = (contentEl?.scrollTop ?? 0) <= 0;
+
+        if (!isDragging) {
+            const shouldStartDrag =
+                atTop && (deltaY > 0 || (deltaY < 0 && sheetState === 'collapsed'));
+            if (!shouldStartDrag) return;
+            dragFromContentRef.current = true;
+            setIsDragging(true);
+            setTranslateY(deltaY);
+            e.preventDefault();
+            return;
+        }
+
+        if (!dragFromContentRef.current) return;
+        setTranslateY(deltaY);
+        e.preventDefault();
+    }, [isDragging, sheetState]);
+
+    const handleContentTouchEnd = useCallback(() => {
+        if (!isDragging || sheetState === 'hidden') return;
+        if (!dragFromContentRef.current) return;
+        dragFromContentRef.current = false;
+        handleTouchEnd();
+    }, [handleTouchEnd, isDragging, sheetState]);
+
     const handleHandleClick = useCallback(() => {
         setSheetState(prev => {
             if (prev === 'hidden') return 'collapsed';
@@ -100,15 +143,11 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
     const finalHeightVh = isHidden ? 0 : Math.max(10, Math.min(95, baseHeightVh + dragOffsetVh));
 
     // 阻止内容区域的触摸事件传播
-    const handleContentTouchStart = useCallback((e: React.TouchEvent) => {
-        e.stopPropagation();
-    }, []);
-
     return (
         <div
             className={`
                 fixed z-50 bg-white shadow-2xl flex flex-col
-                ${isDragging ? 'transition-none' : 'transition-all duration-300 ease-in-out'}
+                ${isDragging ? 'transition-none' : 'transition-all duration-300'}
                 ${isHidden
                     ? 'bottom-4 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full cursor-pointer hover:scale-105 active:scale-95'
                     : 'bottom-0 left-0 right-0 rounded-t-[24px]'
@@ -119,6 +158,8 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
                 boxShadow: isHidden
                     ? '0 4px 20px rgba(0,0,0,0.15)'
                     : '0 -8px 30px rgba(0, 0, 0, 0.12)',
+                transitionTimingFunction: isDragging ? undefined : 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+                willChange: isDragging ? 'height' : undefined,
             }}
             onClick={isHidden ? handleHandleClick : undefined}
         >
@@ -158,7 +199,10 @@ export default function MobileBottomSheet({ children, title = '行程列表' }: 
                 {/* Content */}
                 <div
                     className="flex-1 overflow-y-auto overscroll-contain px-1"
+                    ref={contentRef}
                     onTouchStart={handleContentTouchStart}
+                    onTouchMove={handleContentTouchMove}
+                    onTouchEnd={handleContentTouchEnd}
                     style={{
                         WebkitOverflowScrolling: 'touch',
                         touchAction: 'pan-y',

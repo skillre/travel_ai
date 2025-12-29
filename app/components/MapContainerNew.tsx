@@ -42,6 +42,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         const hoverInfoWindowRef = useRef<any>(null);
         const detailInfoWindowRef = useRef<any>(null);
         const isInitializedRef = useRef(false);
+        const hasAnimatedFitRef = useRef(false);
 
         const [isLoading, setIsLoading] = useState(true);
         const [error, setError] = useState<string | null>(null);
@@ -417,6 +418,10 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                                 prevItem.location.lat, prevItem.location.lng,
                                 item.location.lat, item.location.lng
                             );
+                            if (distance < 60) {
+                                prevItem = item;
+                                return;
+                            }
                             const isWalking = distance < 2000;
                             const estimatedTime = getEstimatedTime(distance, isWalking);
                             const distanceText = distance < 1000
@@ -434,12 +439,12 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             midEl.style.pointerEvents = 'none';
                             midEl.style.zIndex = '1';
                             midEl.innerHTML = `
-                                <div style="background:white;padding:4px 6px;border-radius:12px;
-                                    box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">
+                                <div style="background:white;padding:3px 5px;border-radius:10px;
+                                    box-shadow:0 2px 8px rgba(0,0,0,0.18);border:1.5px solid ${dayColor};font-size:12px;">
                                     ${isWalking ? '🚶' : '🚗'}
                                 </div>
                                 <div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;
-                                    font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div>
+                                    font-size:8px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div>
                             `;
                             const midMarker = new mapboxRef.current.Marker({ element: midEl, anchor: 'center' })
                                 .setLngLat([midLng, midLat])
@@ -656,6 +661,11 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                             prevItem.location.lat, prevItem.location.lng,
                             item.location.lat, item.location.lng
                         );
+                        if (distance < 60) {
+                            prevItem = item;
+                            prevLngLat = lnglat;
+                            return;
+                        }
 
                         const isWalking = distance < 2000; // < 2km = Walking
                         const midLat = (prevItem.location.lat + item.location.lat) / 2;
@@ -690,7 +700,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                         const t = (itemIndex % 2 === 0) ? 0.42 : 0.58;
                         const posLat = prevItem.location.lat + (item.location.lat - prevItem.location.lat) * t;
                         const posLng = prevItem.location.lng + (item.location.lng - prevItem.location.lng) * t;
-                        const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;"><div style="background:white;padding:4px 6px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.2);border:2px solid ${dayColor};font-size:14px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:9px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div></div>`;
+                        const transportIconContent = `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none;"><div style="background:white;padding:3px 5px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.18);border:1.5px solid ${dayColor};font-size:12px;">${isWalking ? '🚶' : '🚗'}</div><div style="background:${dayColor};color:white;padding:2px 6px;border-radius:8px;font-size:8px;font-weight:600;white-space:nowrap;">约${estimatedTime} · ${distanceText}</div></div>`;
                         const midMarker = new AMap.Marker({
                             position: new AMap.LngLat(posLng, posLat),
                             content: transportIconContent,
@@ -964,6 +974,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                 mapInstance.current = null;
             }
             isInitializedRef.current = false;
+            hasAnimatedFitRef.current = false;
 
             const initMap = async () => {
                 try {
@@ -1098,6 +1109,7 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
         // 监听 selectedDay 变化更新可见性
         useEffect(() => {
             if (!mapReady || !isInitializedRef.current) return;
+            const shouldAnimate = hasAnimatedFitRef.current;
             if (provider === 'mapbox') {
                 if (mapboxHoverPopupRef.current) {
                     try { mapboxHoverPopupRef.current.remove?.(); } catch { }
@@ -1158,7 +1170,8 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     if (coords.length > 0) {
                         const bounds = new mapboxRef.current.LngLatBounds(coords[0], coords[0]);
                         for (const c of coords) bounds.extend(c);
-                        map.fitBounds(bounds, { padding, duration: 0, maxZoom: 16 });
+                        map.fitBounds(bounds, { padding, duration: shouldAnimate ? 650 : 0, maxZoom: 16 });
+                        hasAnimatedFitRef.current = true;
                     }
                 }
             } else {
@@ -1174,12 +1187,14 @@ const MapContainerNew = forwardRef<MapContainerNewRef, MapContainerNewProps>(
                     if (selectedDay === null) {
                         const allMarkers = markersRef.current.flat();
                         if (allMarkers.length > 0) {
-                            map.setFitView(allMarkers, true, padding);
+                            map.setFitView(allMarkers, !shouldAnimate, padding);
+                            hasAnimatedFitRef.current = true;
                         }
                     } else {
                         const dayMarkers = markersRef.current[selectedDay];
                         if (dayMarkers && dayMarkers.length > 0) {
-                            map.setFitView(dayMarkers, true, padding);
+                            map.setFitView(dayMarkers, !shouldAnimate, padding);
+                            hasAnimatedFitRef.current = true;
                         }
                     }
                 }
